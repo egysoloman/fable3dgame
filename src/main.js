@@ -391,7 +391,7 @@ class Game {
         for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus', 'ctf', 'hardpoint', 'gungame', 'snd', 'infection']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
-        for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory']) {
+        for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory', 'tunnels', 'ruins']) {
           $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
         }
         $('setup-loadout-sum').textContent = ui.loadoutSummary();
@@ -609,7 +609,7 @@ class Game {
       ui.saveSetup();
       $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
     });
-    for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory']) {
+    for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory', 'tunnels', 'ruins']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
     }
     for (const slot of Object.keys(ATTACHMENTS)) {
@@ -634,7 +634,7 @@ class Game {
     }
     $('lobby-map-btn').addEventListener('click', () => {
       // host cycles the co-op map
-      const cycle = ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory'];
+      const cycle = ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory', 'tunnels', 'ruins'];
       game.setup.map = cycle[(cycle.indexOf(game.setup.map) + 1) % cycle.length];
       ui.saveSetup();
       $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);

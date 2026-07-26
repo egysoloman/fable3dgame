@@ -715,6 +715,97 @@ export const MAPS = {
     },
   },
 
+  tunnels: {
+    id: 'tunnels',
+    size: 70,
+    fog: [0x0a0c08, 10, 52],   // claustrophobic dark
+    bg: 0x060704,
+    hemi: [0x8a7a5a, 0x0a0a06, 0.7],
+    sun: [0xffd8a0, 0.5],
+    floorColors: ['#181510', '#262018', '#4a4030'],
+    accents: [
+      [-16, 0xffb347, -16], [16, 0x62f0ff, 16], [-16, 0xff3bd4, 16], [16, 0x27ff8a, -16],
+    ],
+    playerSpawn: [0, 30],
+    domPoints: [[-16, -16], [16, 16], [0, 0]],
+    vehicles: [],
+    build(w) {
+      // solid city blocks leave a grid of 6-wide corridors under a full
+      // ceiling slab — pure close-quarters knife-fight territory
+      for (const bx of [-24, -8, 8, 24]) {
+        for (const bz of [-24, -8, 8, 24]) {
+          w.addBox(bx, 1.8, bz, 10, 3.6, 10, w.mats.bunker);
+        }
+      }
+      // ceiling (leaves a lip at the perimeter walls)
+      w.addBox(0, 4.0, 0, this.size, 0.5, this.size, w.mats.bunker);
+      // crates at intersections for cover in the open crossings
+      for (const [cx, cz] of [[0, 16], [0, -16], [16, 0], [-16, 0]]) {
+        w.addBox(cx + 1.5, 0.6, cz, 1.4, 1.2, 1.4, w.mats.crate);
+      }
+      // glow strips light the main galleries
+      for (const gx of [-16, 0, 16]) {
+        w.addTrim(gx, 3.6, 0, 0.3, 0.1, 56);
+        w.addTrim(0, 3.6, gx, 56, 0.1, 0.3);
+      }
+      w.spawnPoints = [
+        [0, 16], [0, -16], [16, 0], [-16, 0],
+        [16, 16], [-16, -16], [16, -16], [-16, 16],
+      ].map(([sx, sz]) => new THREE.Vector3(sx, 0, sz));
+    },
+  },
+
+  ruins: {
+    id: 'ruins',
+    size: 110,
+    sky: 'dusk',
+    fog: [0x18120c, 30, 150],
+    bg: 0x18120c,
+    hemi: [0x9a8a6a, 0x141008, 0.9],
+    sun: [0xffc890, 1.1],
+    floorColors: ['#241f18', '#363028', '#6a6154'],
+    accents: [
+      [-35, 0xffb347, -35], [35, 0xff6a3b, 35], [-35, 0xffcf3b, 35], [35, 0xff8a5a, -35],
+    ],
+    playerSpawn: [0, 44],
+    domPoints: [[-28, -14], [28, 8], [0, -34]],
+    vehicles: [[-8, 38, 0.4], [8, 38, -0.4], [-18, 34, 0, 'tank']],
+    build(w) {
+      const rand = mulberry32(6767);
+      // gutted building shells: enterable ground floors with walkable
+      // upper slabs; some walls collapsed to rubble height
+      const shells = [[-28, -14, 0], [28, 8, 1], [-24, 18, 2], [22, -28, 3]];
+      for (const [bx, bz, k] of shells) {
+        const wH = 4.2;
+        w.addBox(bx, wH / 2, bz - 7, 16, wH, 1, w.mats.bunker);      // back wall
+        w.addBox(bx - 7.5, wH / 2, bz - 1, 1, wH, 11, w.mats.bunker); // side wall
+        w.addBox(bx + 7.5, 1.1, bz - 1, 1, 2.2, 11, w.mats.ruin);     // collapsed side
+        w.addBox(bx - 2 + (k % 2) * 5, wH / 2, bz + 6, 8, wH, 1, w.mats.bunker); // front w/ gap
+        w.addBox(bx, wH + 0.25, bz, 16, 0.5, 8, w.mats.bunker);       // upper slab
+        w.addTrim(bx, wH + 0.55, bz, 16.2, 0.12, 8.2);
+        // stairs of debris up to the slab
+        w.addBox(bx - 5, 0.7, bz + 9.5, 2.4, 1.4, 2.4, w.mats.ruin);
+        w.addBox(bx - 2, 1.9, bz + 10.5, 2.4, 1.4, 2.4, w.mats.ruin);
+        w.addBox(bx + 1, 3.1, bz + 9.5, 2.4, 1.4, 2.4, w.mats.ruin);
+      }
+      // cratered main street: burned-out hulks and rubble mounds
+      for (const [hx, hz] of [[-2, 12], [10, -8], [-12, -22]]) {
+        w.addBox(hx, 0.9, hz, 2.2, 1.8, 4.6, w.mats.container);
+      }
+      for (let i = 0; i < 16; i++) {
+        const x = (rand() - 0.5) * (this.size - 14);
+        const z = (rand() - 0.5) * (this.size - 14);
+        if (Math.hypot(x - this.playerSpawn[0], z - this.playerSpawn[1]) < 10) continue;
+        if (shells.some(([sx, sz]) => Math.abs(x - sx) < 10 && Math.abs(z - sz) < 9)) continue;
+        if (this.vehicles.some(([vx, vz]) => Math.hypot(x - vx, z - vz) < 5)) continue;
+        const s = 1.2 + rand() * 2.4;
+        const h = 0.6 + rand() * 1.6;
+        w.addBox(x, h / 2, z, s, h, s * (0.6 + rand() * 0.7), w.mats.ruin);
+      }
+      w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
+    },
+  },
+
   rooftop: {
     id: 'rooftop',
     size: 100,

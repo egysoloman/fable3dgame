@@ -140,6 +140,17 @@
   #oob-warning.visible { display: block; }
   @keyframes oob-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
   .pick-row { display: flex; gap: 12px; margin: 8px 0 4px; flex-wrap: wrap; justify-content: center; }
+  .map-card {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 6px 6px 7px; width: 132px;
+  }
+  .map-card img {
+    width: 118px; height: 66px; object-fit: cover; border-radius: 2px;
+    display: block; opacity: 0.8; background: #0a1018;
+  }
+  .map-card:hover img { opacity: 0.95; }
+  .map-card.sel img { opacity: 1; box-shadow: 0 0 8px rgba(39,232,255,0.6); }
+  .map-card span { font-size: 11px; letter-spacing: 1.5px; }
   #loadout-cols { display: flex; gap: 18px; justify-content: center; align-items: flex-start; flex-wrap: wrap; max-width: 1100px; }
   .lo-col { min-width: 200px; }
   .lo-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 42vh; overflow-y: auto; padding-right: 4px; }
@@ -518,15 +529,17 @@
     <button class="pick" id="diff-expert" data-i18n="diff.expert"></button>
   </div>
   <div class="setup-label" data-i18n="setup.map"></div>
-  <div class="pick-row">
-    <button class="pick" id="map-arena" data-i18n="map.arena"></button>
-    <button class="pick" id="map-battlefield" data-i18n="map.battlefield"></button>
-    <button class="pick" id="map-station" data-i18n="map.station"></button>
-    <button class="pick" id="map-carrier" data-i18n="map.carrier"></button>
-    <button class="pick" id="map-desert" data-i18n="map.desert"></button>
-    <button class="pick" id="map-rooftop" data-i18n="map.rooftop"></button>
-    <button class="pick" id="map-snow" data-i18n="map.snow"></button>
-    <button class="pick" id="map-factory" data-i18n="map.factory"></button>
+  <div class="pick-row" id="map-row">
+    <button class="pick map-card" id="map-arena"><img src="assets/maps/arena.jpg" alt=""><span data-i18n="map.arena"></span></button>
+    <button class="pick map-card" id="map-battlefield"><img src="assets/maps/battlefield.jpg" alt=""><span data-i18n="map.battlefield"></span></button>
+    <button class="pick map-card" id="map-station"><img src="assets/maps/station.jpg" alt=""><span data-i18n="map.station"></span></button>
+    <button class="pick map-card" id="map-carrier"><img src="assets/maps/carrier.jpg" alt=""><span data-i18n="map.carrier"></span></button>
+    <button class="pick map-card" id="map-desert"><img src="assets/maps/desert.jpg" alt=""><span data-i18n="map.desert"></span></button>
+    <button class="pick map-card" id="map-rooftop"><img src="assets/maps/rooftop.jpg" alt=""><span data-i18n="map.rooftop"></span></button>
+    <button class="pick map-card" id="map-snow"><img src="assets/maps/snow.jpg" alt=""><span data-i18n="map.snow"></span></button>
+    <button class="pick map-card" id="map-factory"><img src="assets/maps/factory.jpg" alt=""><span data-i18n="map.factory"></span></button>
+    <button class="pick map-card" id="map-tunnels"><img src="assets/maps/tunnels.jpg" alt=""><span data-i18n="map.tunnels"></span></button>
+    <button class="pick map-card" id="map-ruins"><img src="assets/maps/ruins.jpg" alt=""><span data-i18n="map.ruins"></span></button>
   </div>
   <div class="setup-label" data-i18n="loadout.title"></div>
   <div><button class="pick" id="setup-loadout-sum" style="margin-top:6px"></button></div>
