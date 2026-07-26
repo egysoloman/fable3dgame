@@ -194,11 +194,35 @@ class Explosive {
       this.explode();
       return false;
     }
-    const pos = this.mesh.position;
-    if (this.kind === 'grenade') this.vel.y -= 22 * dt;
 
-    // integrate + collide against world AABBs
-    const step = this.vel.clone().multiplyScalar(dt);
+    // substep so fast projectiles can't tunnel through 1-unit walls when
+    // dt hits the 0.05s clamp (rocket: 30 * 0.05 = 1.5 units/frame)
+    const speed = this.vel.length();
+    const steps = Math.max(1, Math.ceil((speed * dt) / 0.3));
+    const h = dt / steps;
+    for (let s = 0; s < steps; s++) {
+      if (!this._step(h)) return false;
+    }
+
+    const pos = this.mesh.position;
+    if (this.kind === 'rocket') {
+      this.mesh.lookAt(pos.clone().add(this.vel));
+      if (Math.random() < 0.8) {
+        this.game.effects.spawnParticle(pos, new THREE.Vector3(0, 0.5, 0), _rocketTrail, 0.35, 0);
+      }
+    } else {
+      this.mesh.rotation.x += dt * 6;
+      this.mesh.rotation.z += dt * 4;
+    }
+    return true;
+  }
+
+  // One integration substep. Returns false if the explosive detonated.
+  _step(h) {
+    const pos = this.mesh.position;
+    if (this.kind === 'grenade') this.vel.y -= 22 * h;
+
+    const step = this.vel.clone().multiplyScalar(h);
     pos.add(step);
 
     let hit = null;
@@ -213,16 +237,14 @@ class Explosive {
 
     if (this.kind === 'rocket') {
       if (hit || hitFloor) { this.explode(); return false; }
-      // direct hit on an enemy detonates too
+      // direct hit detonates: distance to the closest point on the enemy AABB
       for (const e of this.game.enemies.list) {
         if (!e.alive) continue;
-        const dx = pos.x - e.position.x, dz = pos.z - e.position.z;
-        const dy = pos.y - (e.position.y + e.height * 0.5);
-        if (dx * dx + dz * dz + dy * dy < 1.1) { this.explode(); return false; }
-      }
-      this.mesh.lookAt(pos.clone().add(this.vel));
-      if (Math.random() < 0.8) {
-        this.game.effects.spawnParticle(pos, new THREE.Vector3(0, 0.5, 0), _rocketTrail, 0.35, 0);
+        const cx = Math.max(e.position.x - e.halfW, Math.min(pos.x, e.position.x + e.halfW));
+        const cy = Math.max(e.position.y, Math.min(pos.y, e.position.y + e.height));
+        const cz = Math.max(e.position.z - e.halfW, Math.min(pos.z, e.position.z + e.halfW));
+        const dx = pos.x - cx, dy = pos.y - cy, dz = pos.z - cz;
+        if (dx * dx + dy * dy + dz * dz < 0.35 * 0.35) { this.explode(); return false; }
       }
     } else {
       // grenades bounce
@@ -240,8 +262,6 @@ class Explosive {
         else if (az > ay) this.vel.z *= -0.4;
         else this.vel.y *= -0.4;
       }
-      this.mesh.rotation.x += dt * 6;
-      this.mesh.rotation.z += dt * 4;
     }
     return true;
   }
@@ -435,7 +455,10 @@ export class WeaponSystem {
     w.bloom = Math.min(w.def.bloom * 6, w.bloom + w.def.bloom);
     this.game.audio.shot(w.def.sound);
     this.recoilOffset = Math.min(0.22, this.recoilOffset + w.def.recoil * 1.6);
-    this.game.player.pitch += w.def.kick * (1 - this.adsAmount * 0.4);
+    const player = this.game.player;
+    player.pitch += w.def.kick * (1 - this.adsAmount * 0.4);
+    const pitchLim = Math.PI / 2 - 0.01;
+    player.pitch = Math.max(-pitchLim, Math.min(pitchLim, player.pitch));
     this.flashTimer = 0.05;
     w.flashMesh.material.opacity = 1;
     w.flashMesh.rotation.z = Math.random() * Math.PI;
@@ -451,8 +474,11 @@ export class WeaponSystem {
 
     if (w.def.rocket) {
       const vel = baseDir.clone().multiplyScalar(w.def.rocket.speed);
+      // spawn at the eye, not the muzzle: a muzzle pressed into a wall would
+      // put the rocket on the far side of it
+      const spawn = camPos.clone().addScaledVector(baseDir, 0.3);
       this.explosives.push(new Explosive(
-        this.game, 'rocket', muzzlePos, vel, w.def.rocket));
+        this.game, 'rocket', spawn, vel, w.def.rocket));
     } else {
       const targets = [
         ...this.game.world.colliderMeshes,

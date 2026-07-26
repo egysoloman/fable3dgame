@@ -107,6 +107,34 @@ class Game {
       }, 250);
     });
 
+    // Recovery paths for playing without pointer lock (e.g. resume clicked
+    // during the browser's ~1.25s re-lock cooldown after Esc): click re-locks,
+    // Esc still pauses.
+    this.renderer.domElement.addEventListener('mousedown', () => {
+      if (this.state === 'playing' && !this.pointerLocked) this.requestLock();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' && this.state === 'playing' && !this.pointerLocked) {
+        this.pause();
+      }
+    });
+
+    // Keep crouch/reload/switch combos (Ctrl+W/R/1-8...) from triggering
+    // browser shortcuts, and guard against accidental tab close mid-run.
+    const GAME_KEYS = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'Space',
+      'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8',
+    ]);
+    window.addEventListener('keydown', (e) => {
+      if (this.playing && GAME_KEYS.has(e.code)) e.preventDefault();
+    });
+    window.addEventListener('beforeunload', (e) => {
+      if (this.state === 'playing' || this.state === 'paused') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
     this._wireSettings();
 
     this.loop = this.loop.bind(this);
@@ -296,10 +324,24 @@ class Game {
     this.hud.setStreak(0);
   }
 
+  // True when world geometry blocks the segment from a blast point to a target.
+  _splashBlocked(from, to) {
+    const dir = _splashDir.subVectors(to, from);
+    const dist = dir.length();
+    if (dist < 0.001) return false;
+    dir.divideScalar(dist);
+    _splashRay.set(from, dir);
+    _splashRay.far = dist;
+    return _splashRay.intersectObjects(this.world.colliderMeshes, false).length > 0;
+  }
+
   // Explosion damage: enemies take falloff damage, the player takes half.
+  // Cover matters: blocked line of sight cuts damage to 25%.
   applySplash(pos, radius, dmg) {
     this.effects.explosion(pos);
     this.audio.explosion();
+    const origin = pos.clone();
+    origin.y += 0.25; // lift off the floor so the LOS ray doesn't graze it
 
     for (const e of this.enemies.list) {
       if (!e.alive) continue;
@@ -307,14 +349,17 @@ class Game {
         e.position.x, e.position.y + e.height * 0.5, e.position.z);
       const d = center.distanceTo(pos);
       if (d < radius) {
-        const falloff = Math.max(0.3, 1 - d / radius);
+        let falloff = Math.max(0.3, 1 - d / radius);
+        if (this._splashBlocked(origin, center)) falloff *= 0.25;
         e.takeDamage(dmg * falloff, center, false);
       }
     }
 
-    const pd = this.player.eyePosition.distanceTo(pos);
+    const eye = this.player.eyePosition;
+    const pd = eye.distanceTo(pos);
     if (pd < radius) {
-      const falloff = Math.max(0.3, 1 - pd / radius);
+      let falloff = Math.max(0.3, 1 - pd / radius);
+      if (this._splashBlocked(origin, eye)) falloff *= 0.25;
       this.player.takeDamage(dmg * falloff * 0.5, pos);
     }
     if (pd < radius * 3) {
@@ -348,6 +393,9 @@ class Game {
     this.renderer.render(this.scene, this.camera);
   }
 }
+
+const _splashRay = new THREE.Raycaster();
+const _splashDir = new THREE.Vector3();
 
 const game = new Game();
 // Exposed for debugging and automated smoke tests.

@@ -33,7 +33,7 @@ Then open <http://localhost:8080> and click **ENGAGE**.
 | Right click (hold) | Aim down sights |
 | `G` | Throw frag grenade |
 | `Shift` | Sprint |
-| `Ctrl` (hold) / `C` (toggle) | Crouch |
+| `C` (toggle) / `Ctrl` (hold) | Crouch |
 | `Space` | Jump (crates are climbable) |
 | `1`–`8` or wheel | Switch weapon |
 | `R` | Reload |

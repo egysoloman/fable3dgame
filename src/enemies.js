@@ -225,7 +225,8 @@ class Enemy {
     this.attackCooldown -= dt;
     if (t.attack === 'melee') {
       const vDiff = Math.abs((player.position.y) - this.position.y);
-      if (dist < t.meleeRange && vDiff < 1.6 && this.attackCooldown <= 0 && player.alive) {
+      if (dist < t.meleeRange && vDiff < 1.6 && this.attackCooldown <= 0 && player.alive &&
+          this._hasLineOfSight()) { // no clawing through crate corners
         this.attackCooldown = t.meleeCooldown;
         player.takeDamage(t.meleeDmg, this.position);
         // lunge visual
@@ -376,33 +377,40 @@ class Projectile {
     this.life -= dt;
     if (this.life <= 0) return false;
     const pos = this.mesh.position;
-    pos.addScaledVector(this.velocity, dt);
 
-    // world collision
-    for (const c of this.game.world.colliders) {
-      if (
-        pos.x > c.min.x - 0.13 && pos.x < c.max.x + 0.13 &&
-        pos.y > c.min.y - 0.13 && pos.y < c.max.y + 0.13 &&
-        pos.z > c.min.z - 0.13 && pos.z < c.max.z + 0.13
-      ) {
+    // substep so bolts can't skip through thin walls at clamped dt
+    const speed = this.velocity.length();
+    const steps = Math.max(1, Math.ceil((speed * dt) / 0.3));
+    const h = dt / steps;
+    for (let s = 0; s < steps; s++) {
+      pos.addScaledVector(this.velocity, h);
+
+      // world collision
+      for (const c of this.game.world.colliders) {
+        if (
+          pos.x > c.min.x - 0.13 && pos.x < c.max.x + 0.13 &&
+          pos.y > c.min.y - 0.13 && pos.y < c.max.y + 0.13 &&
+          pos.z > c.min.z - 0.13 && pos.z < c.max.z + 0.13
+        ) {
+          this.game.effects.burst(pos, 0xff6a2a, 6, 3, 0.3, 5);
+          return false;
+        }
+      }
+      if (pos.y < 0.05) {
         this.game.effects.burst(pos, 0xff6a2a, 6, 3, 0.3, 5);
         return false;
       }
-    }
-    if (pos.y < 0.05) {
-      this.game.effects.burst(pos, 0xff6a2a, 6, 3, 0.3, 5);
-      return false;
-    }
 
-    // player collision (AABB expanded by projectile radius)
-    const p = this.game.player;
-    if (p.alive &&
-      pos.x > p.position.x - 0.5 && pos.x < p.position.x + 0.5 &&
-      pos.y > p.position.y - 0.1 && pos.y < p.position.y + 1.9 &&
-      pos.z > p.position.z - 0.5 && pos.z < p.position.z + 0.5
-    ) {
-      p.takeDamage(this.dmg, pos);
-      return false;
+      // player collision (AABB expanded by projectile radius)
+      const p = this.game.player;
+      if (p.alive &&
+        pos.x > p.position.x - 0.5 && pos.x < p.position.x + 0.5 &&
+        pos.y > p.position.y - 0.1 && pos.y < p.position.y + 1.9 &&
+        pos.z > p.position.z - 0.5 && pos.z < p.position.z + 0.5
+      ) {
+        p.takeDamage(this.dmg, pos);
+        return false;
+      }
     }
 
     // faint trail
