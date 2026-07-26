@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON STRIKE — 3D Web FPS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070d'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2327e8ff' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2327e8ff'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --neon: #27e8ff;
+    --neon-dim: #17a0b4;
+    --danger: #ff3b3b;
+    --warn: #ffcf3b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05070d; }
+  body { font-family: "Courier New", monospace; color: #d7faff; user-select: none; }
+  canvas { display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  #hud.visible { display: block; }
+
+  #crosshair {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  }
+  #crosshair span {
+    position: absolute; background: var(--neon);
+    box-shadow: 0 0 6px var(--neon);
+  }
+  #crosshair .t { left: -1px; bottom: 5px; width: 2px; height: 7px; }
+  #crosshair .b { left: -1px; top: 5px;    width: 2px; height: 7px; }
+  #crosshair .l { top: -1px;  right: 5px;  width: 7px; height: 2px; }
+  #crosshair .r { top: -1px;  left: 5px;   width: 7px; height: 2px; }
+  #crosshair .dot { left: -1px; top: -1px; width: 2px; height: 2px; }
+  #crosshair.hidden { display: none; }
+
+  #hitmarker {
+    position: absolute; left: 50%; top: 50%; width: 28px; height: 28px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    opacity: 0; transition: opacity 0.18s ease-out;
+  }
+  #hitmarker span { position: absolute; background: #fff; box-shadow: 0 0 6px #fff; }
+  #hitmarker .t { left: 13px; top: 0;    width: 2px; height: 8px; }
+  #hitmarker .b { left: 13px; bottom: 0; width: 2px; height: 8px; }
+  #hitmarker .l { top: 13px;  left: 0;   width: 8px; height: 2px; }
+  #hitmarker .r { top: 13px;  right: 0;  width: 8px; height: 2px; }
+  #hitmarker.kill span { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+  #vignette {
+    position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 20, 20, 0.55) 100%);
+    transition: opacity 0.35s ease-out;
+  }
+  #lowhp {
+    position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 0, 0, 0.35) 100%);
+    animation: lowhp-pulse 1.1s ease-in-out infinite;
+    animation-play-state: paused;
+  }
+  #lowhp.active { animation-play-state: running; }
+  @keyframes lowhp-pulse { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.65; } }
+
+  /* damage direction indicators */
+  .dmgdir {
+    position: absolute; left: 50%; top: 50%; width: 120px; height: 120px;
+    margin: -60px 0 0 -60px; opacity: 0; transition: opacity 0.5s ease-out;
+  }
+  .dmgdir::before {
+    content: ""; position: absolute; left: 50%; top: -34px;
+    margin-left: -22px; border-left: 22px solid transparent;
+    border-right: 22px solid transparent;
+    border-bottom: 16px solid rgba(255, 45, 45, 0.85);
+    filter: drop-shadow(0 0 8px rgba(255, 45, 45, 0.9));
+  }
+
+  /* sniper scope */
+  #scope { position: absolute; inset: 0; display: none; }
+  #scope.visible { display: block; }
+  #scope .mask {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at center,
+      transparent 0, transparent 31vmin, rgba(2, 4, 8, 0.985) 33vmin);
+  }
+  #scope .lineh, #scope .linev { position: absolute; background: rgba(180, 245, 255, 0.9); }
+  #scope .lineh { left: 50%; top: 15%; width: 1px; height: 70%; transform: translateX(-0.5px); }
+  #scope .linev { top: 50%; left: 15%; height: 1px; width: 70%; transform: translateY(-0.5px); }
+
+  .panel {
+    position: absolute; padding: 10px 16px;
+    background: rgba(5, 12, 20, 0.55);
+    border: 1px solid rgba(39, 232, 255, 0.35);
+    border-radius: 4px;
+    text-shadow: 0 0 8px rgba(39, 232, 255, 0.8);
+  }
+
+  #health-panel { left: 24px; bottom: 24px; min-width: 220px; }
+  #health-label { font-size: 12px; letter-spacing: 2px; color: var(--neon-dim); }
+  #health-value { font-size: 30px; font-weight: bold; line-height: 1; }
+  #health-bar-track {
+    margin-top: 6px; height: 8px; background: rgba(255,255,255,0.08);
+    border-radius: 2px; overflow: hidden;
+  }
+  #health-bar {
+    height: 100%; width: 100%; background: var(--neon);
+    box-shadow: 0 0 8px var(--neon); transition: width 0.15s ease-out;
+  }
+  #health-panel.hurt #health-bar { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  #health-panel.hurt #health-value { color: var(--danger); }
+
+  #ammo-panel { right: 24px; bottom: 24px; text-align: right; min-width: 200px; }
+  #weapon-name { font-size: 12px; letter-spacing: 2px; color: var(--neon-dim); }
+  #ammo-value { font-size: 30px; font-weight: bold; line-height: 1.1; }
+  #ammo-reserve { font-size: 15px; color: #7fdceb; }
+  #grenade-row { font-size: 14px; color: var(--warn); letter-spacing: 3px; margin-top: 2px; }
+  #reload-hint { font-size: 12px; color: var(--warn); visibility: hidden; }
+  #reload-hint.visible { visibility: visible; animation: blink 0.6s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  #score-panel { top: 20px; right: 24px; text-align: right; min-width: 150px; }
+  #score-value { font-size: 24px; font-weight: bold; }
+  #score-label, #wave-label { font-size: 11px; letter-spacing: 2px; color: var(--neon-dim); }
+  #wave-value { font-size: 18px; font-weight: bold; }
+  #enemies-left { font-size: 12px; color: #7fdceb; }
+  #streak-value { font-size: 12px; color: var(--warn); min-height: 15px; }
+
+  #killfeed {
+    position: absolute; top: 175px; right: 24px; text-align: right;
+    font-size: 12px; letter-spacing: 1px;
+  }
+  #killfeed div {
+    margin-top: 4px; padding: 3px 10px;
+    background: rgba(5, 12, 20, 0.5);
+    border-right: 2px solid var(--danger);
+    color: #ffb4b4; opacity: 1; transition: opacity 0.6s ease;
+  }
+  #killfeed div.fading { opacity: 0; }
+
+  #radar-panel { left: 24px; top: 20px; padding: 8px; }
+  #radar { display: block; }
+
+  #compass {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 340px; height: 30px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  }
+
+  #banner {
+    position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+    font-size: 42px; font-weight: bold; letter-spacing: 6px; white-space: nowrap;
+    color: var(--neon); text-shadow: 0 0 18px var(--neon), 0 0 40px rgba(39,232,255,.6);
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+  #banner.visible { opacity: 1; }
+  #banner.danger { color: var(--danger); text-shadow: 0 0 18px var(--danger); }
+  #banner.streak { color: var(--warn); text-shadow: 0 0 18px var(--warn); }
+
+  #subbanner {
+    position: absolute; top: calc(20% + 56px); left: 50%; transform: translateX(-50%);
+    font-size: 16px; letter-spacing: 3px; color: #9feeff; white-space: nowrap;
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+  #subbanner.visible { opacity: 1; }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    position: fixed; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(8, 16, 30, 0.82), rgba(2, 4, 9, 0.96));
+    z-index: 10; text-align: center;
+  }
+  .screen.visible { display: flex; }
+  .screen h1 {
+    font-size: 64px; letter-spacing: 12px; color: var(--neon);
+    text-shadow: 0 0 24px var(--neon), 0 0 70px rgba(39,232,255,.5);
+    margin-bottom: 8px;
+  }
+  .screen h2 { font-size: 28px; letter-spacing: 6px; margin-bottom: 18px; }
+  .screen .sub { color: #8fd8e6; font-size: 15px; margin-bottom: 26px; letter-spacing: 2px; }
+  .screen .stats { font-size: 20px; margin-bottom: 26px; line-height: 1.8; }
+  .screen .stats b { color: var(--neon); }
+  .btn {
+    pointer-events: auto; cursor: pointer;
+    font-family: inherit; font-size: 18px; letter-spacing: 3px;
+    color: #05121a; background: var(--neon);
+    border: none; border-radius: 3px; padding: 14px 42px;
+    box-shadow: 0 0 18px rgba(39, 232, 255, 0.7);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .btn:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(39, 232, 255, 1); }
+  .controls {
+    margin-top: 30px; font-size: 13px; color: #6fb7c4; line-height: 2.1; letter-spacing: 1px;
+  }
+  .controls b { color: #d7faff; background: rgba(255,255,255,0.08); padding: 1px 7px; border-radius: 3px; }
+  #gameover-screen h1 { color: var(--danger); text-shadow: 0 0 24px var(--danger); }
+
+  .settings {
+    margin-top: 30px; font-size: 13px; letter-spacing: 2px; color: #8fd8e6;
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .settings label { display: flex; align-items: center; gap: 12px; }
+  .settings input[type="range"] {
+    pointer-events: auto; width: 180px; accent-color: var(--neon);
+  }
+  .arsenal {
+    margin-top: 26px; font-size: 12px; color: #6fb7c4; letter-spacing: 1px; line-height: 1.9;
+  }
+  .arsenal b { color: var(--neon); }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="vignette"></div>
+  <div id="lowhp"></div>
+  <div id="crosshair"><span class="t"></span><span class="b"></span><span class="l"></span><span class="r"></span><span class="dot"></span></div>
+  <div id="hitmarker"><span class="t"></span><span class="b"></span><span class="l"></span><span class="r"></span></div>
+  <div id="dmgdirs"></div>
+  <div id="scope"><div class="mask"></div><div class="lineh"></div><div class="linev"></div></div>
+
+  <div class="panel" id="health-panel">
+    <div id="health-label">INTEGRITY</div>
+    <div id="health-value">100</div>
+    <div id="health-bar-track"><div id="health-bar"></div></div>
+  </div>
+
+  <div class="panel" id="ammo-panel">
+    <div id="weapon-name">P-9 SIDEARM</div>
+    <div id="ammo-value">&infin;</div>
+    <div id="ammo-reserve"></div>
+    <div id="grenade-row"></div>
+    <div id="reload-hint">[R] RELOAD</div>
+  </div>
+
+  <div class="panel" id="score-panel">
+    <div id="score-label">SCORE</div>
+    <div id="score-value">0</div>
+    <div id="wave-label">WAVE</div>
+    <div id="wave-value">1</div>
+    <div id="enemies-left"></div>
+    <div id="streak-value"></div>
+  </div>
+
+  <div id="killfeed"></div>
+
+  <div class="panel" id="radar-panel"><canvas id="radar" width="140" height="140"></canvas></div>
+  <canvas id="compass" width="340" height="30"></canvas>
+
+  <div id="banner"></div>
+  <div id="subbanner"></div>
+</div>
+
+<div class="screen visible" id="menu-screen">
+  <h1>NEON STRIKE</h1>
+  <div class="sub">HOSTILE MACHINES DETECTED &mdash; SURVIVE THE WAVES</div>
+  <button class="btn" id="start-btn">ENGAGE</button>
+  <div class="controls">
+    <b>W A S D</b> move &nbsp; <b>MOUSE</b> aim &nbsp; <b>LMB</b> fire &nbsp; <b>RMB</b> aim down sights &nbsp; <b>G</b> grenade<br>
+    <b>SHIFT</b> sprint &nbsp; <b>CTRL / C</b> crouch &nbsp; <b>SPACE</b> jump &nbsp;
+    <b>1&ndash;8</b> / <b>WHEEL</b> weapons &nbsp; <b>R</b> reload &nbsp; <b>ESC</b> pause
+  </div>
+  <div class="arsenal">
+    ARSENAL: <b>1</b> P-9 SIDEARM &middot; <b>2</b> VIPER SMG &middot; <b>3</b> HELIX AR &middot; <b>4</b> JUDGE DMR<br>
+    <b>5</b> BREACHER SHOTGUN &middot; <b>6</b> BASTION LMG &middot; <b>7</b> SPECTRE SNIPER &middot; <b>8</b> HAVOC LAUNCHER
+  </div>
+</div>
+
+<div class="screen" id="pause-screen">
+  <h2>PAUSED</h2>
+  <button class="btn" id="resume-btn">RESUME</button>
+  <div class="settings">
+    <label>SENSITIVITY <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1"><span id="sens-value">1.0</span></label>
+    <label>VOLUME <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.7"><span id="vol-value">0.7</span></label>
+  </div>
+</div>
+
+<div class="screen" id="gameover-screen">
+  <h1>SIGNAL LOST</h1>
+  <div class="stats">
+    SCORE <b id="final-score">0</b> &nbsp;&nbsp; WAVE <b id="final-wave">1</b> &nbsp;&nbsp; KILLS <b id="final-kills">0</b><br>
+    <span style="font-size:15px">BEST STREAK <b id="final-streak">0</b> &nbsp;&nbsp; BEST SCORE <b id="best-score">0</b></span>
+  </div>
+  <button class="btn" id="restart-btn">RE-ENGAGE</button>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "./lib/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
