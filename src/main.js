@@ -90,6 +90,7 @@ class Game {
     this.warfare = new Warfare(this);
     this.orbital = new OrbitalRailgun(this);
     this.smokes = [];
+    this.fires = [];
     this.mode = 'survival';
     this.setup = { mode: 'survival', map: 'arena', difficulty: 'normal', equip: loadEquip() };
     try {
@@ -178,7 +179,7 @@ class Game {
     // Keep crouch/reload/switch combos (Ctrl+W/R/1-8...) from triggering
     // browser shortcuts, and guard against accidental tab close mid-run.
     const GAME_KEYS = new Set([
-      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'KeyE', 'Space',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'KeyE', 'KeyV', 'Space',
       'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8',
       'Digit9', 'Digit0',
     ]);
@@ -782,6 +783,7 @@ class Game {
     this.warfare.reset();
     this.orbital.reset();
     this._updateSmokes(9999);
+    this._updateFires(9999);
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
     this.matchDifficulty = this.setup.difficulty;
     this.enemies = this.mode === 'strike' ? this.soldiers
@@ -860,6 +862,7 @@ class Game {
     this.warfare.reset();
     this.orbital.reset();
     this._updateSmokes(9999);
+    this._updateFires(9999);
     this.soldiers.reset();
     if (mode === 'versus' || mp.isHost) {
       this.enemiesSolo.reset();
@@ -1153,6 +1156,65 @@ class Game {
     }
   }
 
+  // Molotov fire zone: a burning patch that ticks damage on anything inside.
+  applyFire(pos, radius, duration) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff7a3b, transparent: true, opacity: 0.3, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mat);
+    const at = pos.clone();
+    at.y = Math.max(0.3, at.y);
+    mesh.position.copy(at);
+    mesh.scale.set(radius, radius * 0.45, radius);
+    this.scene.add(mesh);
+    const light = new THREE.PointLight(0xff8a3b, 50, radius * 4, 1.6);
+    light.position.set(at.x, at.y + 1, at.z);
+    this.scene.add(light);
+    this.fires.push({ pos: at, r: radius, t: duration, total: duration,
+      tick: 0, mesh, mat, light });
+    this.audio.explosion();
+    if (this.mp.active) this.mp.sendBoom(at);
+  }
+
+  _updateFires(dt) {
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i];
+      f.t -= dt;
+      f.tick -= dt;
+      f.mat.opacity = 0.22 + Math.sin(performance.now() / 90 + i) * 0.08;
+      f.light.intensity = 40 + Math.sin(performance.now() / 70) * 14;
+      if (f.tick <= 0) {
+        f.tick = 0.5;
+        if (Math.random() < 0.9) {
+          this.effects.spawnParticle(
+            new THREE.Vector3(f.pos.x + (Math.random() - 0.5) * f.r,
+              f.pos.y + 0.4, f.pos.z + (Math.random() - 0.5) * f.r),
+            new THREE.Vector3(0, 2.5, 0), _fireEmber, 0.5, 0);
+        }
+        // burn everything standing in it
+        for (const e of this.enemies.list) {
+          if (!e.alive || e.spawnTimer > 0) continue;
+          if (Math.hypot(e.position.x - f.pos.x, e.position.z - f.pos.z) < f.r &&
+              e.position.y < f.pos.y + 2) {
+            e.takeDamage(13, e.position, false);
+          }
+        }
+        const p = this.player;
+        if (p.alive &&
+            Math.hypot(p.position.x - f.pos.x, p.position.z - f.pos.z) < f.r &&
+            p.position.y < f.pos.y + 2) {
+          p.takeDamage(9, f.pos, 'splash');
+        }
+      }
+      if (f.t <= 0) {
+        this.scene.remove(f.mesh);
+        this.scene.remove(f.light);
+        f.mesh.geometry.dispose();
+        f.mat.dispose();
+        this.fires.splice(i, 1);
+      }
+    }
+  }
+
   // Smoke screen: a sphere that blocks AI line of sight for its lifetime.
   applySmoke(pos, duration) {
     const mat = new THREE.MeshBasicMaterial({
@@ -1214,6 +1276,7 @@ class Game {
       this.effects.update(gdt);
       this.warfare.update(gdt);
       this._updateSmokes(gdt);
+      this._updateFires(gdt);
       this.orbital.update(gdt);
       if (this.orbital.active) this.orbital.applyCamera();
       this.mp.update(dt);
@@ -1234,6 +1297,7 @@ class Game {
   }
 }
 
+const _fireEmber = new THREE.Color(0xff9a4a);
 const _splashRay = new THREE.Raycaster();
 const _splashDir = new THREE.Vector3();
 

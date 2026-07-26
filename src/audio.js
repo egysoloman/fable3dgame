@@ -183,6 +183,11 @@ export class AudioFX {
     this._noise({ dur: 0.25, gain: 0.5, freq: 6000, freqEnd: 900, type: 'bandpass', Q: 1.2 });
   }
 
+  melee() {
+    this._noise({ dur: 0.12, gain: 0.3, freq: 1400, freqEnd: 300, type: 'bandpass', Q: 1 });
+    this._tone({ freq: 300, freqEnd: 120, dur: 0.1, gain: 0.16, type: 'triangle' });
+  }
+
   rocketFire() {
     this._noise({ dur: 0.35, gain: 0.5, freq: 3000, freqEnd: 500 });
     this._tone({ freq: 220, freqEnd: 90, dur: 0.3, gain: 0.3, type: 'sawtooth' });

@@ -168,6 +168,26 @@ export const WEAPON_DEFS = [
     barrelLen: 0.24, bodyLen: 0.2, thickness: 0.065,
   },
   {
+    id: 'awm', cat: 'primary', wclass: 'sniper', unlockRank: 9, name: 'LONGBOW-50', sound: 'sniper',
+    damage: 200, pellets: 1, fireDelay: 1.6, auto: false,
+    spreadHip: 0.06, spreadAds: 0.0004, bloom: 0.012,
+    magSize: 4, reserve: 16, reloadTime: 3.0,
+    recoil: 0.18, kick: 0.024, tracer: 0xfff0c8,
+    adsFov: 20, scope: true, moveMul: 0.85, headshotMul: 2.5,
+    bodyColor: 0x3a3226, accentColor: 0xffcf3b,
+    barrelLen: 0.8, bodyLen: 0.4, thickness: 0.085, sight: true, mag: true,
+  },
+  {
+    id: 'energy', cat: 'primary', wclass: 'energy', unlockRank: 10, name: 'ARC RIFLE', sound: 'dmr',
+    damage: 26, pellets: 1, fireDelay: 0.32, auto: false, burst: 2, burstDelay: 0.06,
+    spreadHip: 0.014, spreadAds: 0.003, bloom: 0.003,
+    magSize: 20, reserve: 100, reloadTime: 1.6,
+    recoil: 0.03, kick: 0.006, tracer: 0x6affff,
+    adsFov: 50, scope: false, moveMul: 0.96, headshotMul: 2,
+    bodyColor: 0x1e3448, accentColor: 0x62f0ff,
+    barrelLen: 0.55, bodyLen: 0.36, thickness: 0.085, sight: true,
+  },
+  {
     id: 'revolver', cat: 'secondary', wclass: 'revolver', unlockRank: 4, name: 'IRONCLAD .44', sound: 'dmr',
     damage: 55, pellets: 1, fireDelay: 0.5, auto: false,
     spreadHip: 0.016, spreadAds: 0.004, bloom: 0.008,
@@ -176,6 +196,16 @@ export const WEAPON_DEFS = [
     adsFov: 56, scope: false, moveMul: 0.98, headshotMul: 2.5,
     bodyColor: 0x50403c, accentColor: 0xff8a7a,
     barrelLen: 0.36, bodyLen: 0.2, thickness: 0.08,
+  },
+  {
+    id: 'crossbow', cat: 'secondary', wclass: 'crossbow', unlockRank: 6, name: 'STALKER-X', sound: 'dmr',
+    damage: 90, pellets: 1, fireDelay: 1.1, auto: false,
+    spreadHip: 0.01, spreadAds: 0.002, bloom: 0,
+    magSize: 1, reserve: 24, reloadTime: 1.5,
+    recoil: 0.06, kick: 0.01, tracer: 0x8aff8a,
+    adsFov: 50, scope: false, moveMul: 0.98, headshotMul: 2.5,
+    bodyColor: 0x2e3a2e, accentColor: 0x8aff8a,
+    barrelLen: 0.4, bodyLen: 0.3, thickness: 0.09, sight: true,
   },
 ];
 
@@ -190,6 +220,8 @@ export const THROWABLES = {
     throwSpeed: 18, max: 4, flash: true, color: 0xf0f0e0 },
   smoke: { id: 'smoke', lethal: false, fuse: 1.2, splashRadius: 5, splashDmg: 0,
     throwSpeed: 14, max: 4, smoke: true, color: 0x8a97a8 },
+  molotov: { id: 'molotov', lethal: true, fuse: 4, splashRadius: 4.5, splashDmg: 0,
+    throwSpeed: 15, max: 3, molotov: true, color: 0xff7a3b },
 };
 const GRENADE = THROWABLES.frag;
 
@@ -438,6 +470,11 @@ class Explosive {
         if (dx * dx + dy * dy + dz * dz < 0.35 * 0.35) { this.explode(); return false; }
       }
     } else {
+      // molotovs shatter on the first contact
+      if (this.config.molotov && (hit || hitFloor)) {
+        this.explode();
+        return false;
+      }
       // sticky grenades latch onto the first thing they touch
       if (this.config.sticky && (hit || hitFloor)) {
         if (hitFloor) pos.y = 0.11;
@@ -472,6 +509,10 @@ class Explosive {
     }
     if (this.config.smoke) {
       this.game.applySmoke(this.mesh.position.clone(), 8);
+      return;
+    }
+    if (this.config.molotov) {
+      this.game.applyFire(this.mesh.position.clone(), this.config.splashRadius, 6);
       return;
     }
     this.game.applySplash(this.mesh.position, this.config.splashRadius, this.config.splashDmg);
@@ -521,6 +562,7 @@ export class WeaponSystem {
     this.flashTimer = 0;
     this.switchAnim = 0;
     this.grenadeCooldown = 0;
+    this.meleeCooldown = 0;
     this.burstQueue = 0;
     this.burstTimer = 0;
 
@@ -559,6 +601,7 @@ export class WeaponSystem {
       else if (e.code === 'Digit2') this.switchTo(this.carryIndex('secondary'));
       else if (e.code === 'KeyR') this.startReload();
       else if (e.code === 'KeyG') this.throwGrenade();
+      else if (e.code === 'KeyV') this.meleeAttack();
     });
     window.addEventListener('wheel', (e) => {
       if (!this.game.playing || !this.game.pointerLocked) return;
@@ -687,6 +730,46 @@ export class WeaponSystem {
     w.reloadTimer = w.reloadTotal;
     this.game.audio.reload(w.def.id);
     this.updateHud();
+  }
+
+  // quick melee (V): a fast knife jab at anything in arm's reach
+  meleeAttack() {
+    if (this.game.player.vehicle) return;
+    if (this.game.orbital && this.game.orbital.active) return;
+    if (this.meleeCooldown > 0 || !this.game.player.alive) return;
+    this.meleeCooldown = 0.8;
+    this.game.audio.melee();
+    this.recoilOffset = Math.min(0.3, this.recoilOffset + 0.14);
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const from = this.game.player.eyePosition;
+    for (const e of this.game.enemies.list) {
+      if (!e.alive || e.spawnTimer > 0) continue;
+      const c = new THREE.Vector3(
+        e.position.x, e.position.y + (e.height || 1.6) * 0.5, e.position.z);
+      const to = c.clone().sub(from);
+      if (to.length() > 2.6) continue;
+      if (to.normalize().dot(dir) < 0.45) continue;
+      e.takeDamage(60, c, false);
+      this.game.effects.enemyHitSparks(c);
+      this.game.hud.hitmarker(false);
+      this.game.audio.hit(false);
+      return;
+    }
+    if (this.game.mp && this.game.mp.versus) {
+      for (const r of this.game.mp.remoteList()) {
+        if (!r.alive) continue;
+        const c = new THREE.Vector3(r.position.x, r.position.y + 1.2, r.position.z);
+        const to = c.clone().sub(from);
+        if (to.length() > 2.6) continue;
+        if (to.normalize().dot(dir) < 0.45) continue;
+        this.game.effects.enemyHitSparks(c);
+        this.game.hud.hitmarker(false);
+        this.game.audio.hit(false);
+        this.game.mp.sendPvpHit(r.id, 60, c);
+        return;
+      }
+    }
   }
 
   throwGrenade() {
@@ -870,6 +953,7 @@ export class WeaponSystem {
       }
     }
     if (this.grenadeCooldown > 0) this.grenadeCooldown -= dt;
+    if (this.meleeCooldown > 0) this.meleeCooldown -= dt;
     w.bloom = Math.max(0, w.bloom - w.def.bloom * 8 * dt);
 
     // ADS blend (blocked while sprinting hard or reloading the launcher)
