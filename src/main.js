@@ -27,8 +27,11 @@ const SETTINGS_KEY = 'neonstrike.settings';
 const CHEATS_ENABLED = new URLSearchParams(location.search).get('nocheats') !== '1';
 
 const STREAK_REWARDS = {
+  3: { bonus: 150, uav: true, key: 'streakr.uav' },
   5: { bonus: 250, resupply: true, key: 'streakr.resupply' },
+  6: { bonus: 300, airstrike: true, key: 'streakr.airstrike' },
   7: { bonus: 400, orbital: true, key: 'streakr.railgun' },
+  8: { bonus: 500, care: true, key: 'streakr.care' },
   10: { bonus: 750, refill: true },
   12: { bonus: 1000, heli: true, key: 'streakr.heli' },
   15: { bonus: 2000, refill: true },
@@ -98,6 +101,7 @@ class Game {
     this.orbital = new OrbitalRailgun(this);
     this.smokes = [];
     this.fires = [];
+    this.uavTime = 0;
     this.mode = 'survival';
     this.setup = { mode: 'survival', map: 'arena', difficulty: 'normal', equip: loadEquip() };
     try {
@@ -794,6 +798,7 @@ class Game {
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
     this.matchDifficulty = this.setup.difficulty;
     this.meleeOnlyPlayer = false;
+    this.uavTime = 0;
     this.enemies = this.mode === 'strike' ? this.soldiers
       : this.mode === 'domination' ? this.domination
       : this.mode === 'tdm' ? this.tdm
@@ -862,6 +867,7 @@ class Game {
       t(win ? 'strike.win' : 'strike.lose');
     this.hud.subbanner('');
     this.meleeOnlyPlayer = false;
+    this.uavTime = 0;
     this._finishRun();
   }
 
@@ -886,6 +892,7 @@ class Game {
     this._updateSmokes(9999);
     this._updateFires(9999);
     this.meleeOnlyPlayer = false;
+    this.uavTime = 0;
     for (const mgr of [this.soldiers, this.domination, this.botMatch, this.tdm,
       this.ctf, this.hardpoint, this.gungame, this.snd, this.infection]) {
       mgr.reset();
@@ -1083,6 +1090,9 @@ class Game {
         }
       }
       if (reward.orbital) this.orbital.grant(3);
+      if (reward.uav) this.uavTime = 20;
+      if (reward.airstrike) this.warfare.callAirstrike();
+      if (reward.care) this.warfare.dropCarePackage();
       if (reward.heli && !this.mp.active) this.warfare.callHelicopter();
       const label = reward.key ? t(reward.key) : t(`streak.${this.streak}`);
       this.hud.banner(`${label}  +${reward.bonus}`, 'streak');
@@ -1303,6 +1313,7 @@ class Game {
       this.warfare.update(gdt);
       this._updateSmokes(gdt);
       this._updateFires(gdt);
+      if (this.uavTime > 0) this.uavTime -= gdt;
       this.orbital.update(gdt);
       if (this.orbital.active) this.orbital.applyCamera();
       this.mp.update(dt);

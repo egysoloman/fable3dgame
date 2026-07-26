@@ -814,6 +814,8 @@ export class Warfare {
     this.heli = null;
     this.vehicles = [];
     this._remoteVeh = new Map(); // remote player id -> vehicle index
+    this.strikes = [];
+    this.packages = [];
 
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyE' || !game.playing) return;
@@ -840,6 +842,115 @@ export class Warfare {
     if (this.heli) this.heli.life = 30; // extend
     else this.heli = new Helicopter(this.game);
     this.game.hud.killfeed(t('streakr.heli'), 'cheat');
+  }
+
+  // Airstrike (6-killstreak): after a short delay, a stick of five bombs
+  // walks a line across wherever the player is aiming.
+  callAirstrike() {
+    const g = this.game;
+    const dir = g.camera.getWorldDirection(new THREE.Vector3());
+    const eye = g.player.eyePosition;
+    // aim point: crosshair ground intercept, else 25 m out
+    let target;
+    if (dir.y < -0.05) {
+      target = eye.clone().addScaledVector(dir, -eye.y / dir.y);
+    } else {
+      target = eye.clone().addScaledVector(dir, 25);
+      target.y = 0;
+    }
+    const half = g.world.half - 2;
+    target.x = Math.max(-half, Math.min(half, target.x));
+    target.z = Math.max(-half, Math.min(half, target.z));
+    const lat = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    for (let i = 0; i < 5; i++) {
+      const at = target.clone().addScaledVector(lat, (i - 2) * 5);
+      at.y = 0;
+      this.strikes.push({ pos: at, t: 1.2 + i * 0.16 });
+    }
+    g.audio.rocketFire();
+  }
+
+  // Care package (8-killstreak): a crate drops ahead of the player with a
+  // random reward inside — grab it before it expires.
+  dropCarePackage() {
+    const g = this.game;
+    const fwd = g.player.forwardDir();
+    const at = g.player.position.clone().addScaledVector(fwd, 8);
+    const half = g.world.half - 3;
+    at.x = Math.max(-half, Math.min(half, at.x));
+    at.z = Math.max(-half, Math.min(half, at.z));
+    if (!g.world.groundAt(at.x, at.z)) at.copy(g.player.position);
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 1.2, 1.2),
+      new THREE.MeshStandardMaterial({
+        color: 0x2a6a3a, roughness: 0.7, metalness: 0.3,
+        emissive: 0x2aff6a, emissiveIntensity: 0.25 }));
+    mesh.position.set(at.x, 26, at.z);
+    g.scene.add(mesh);
+    const light = new THREE.PointLight(0x2aff6a, 30, 12, 1.8);
+    light.position.set(at.x, 2, at.z);
+    g.scene.add(light);
+    this.packages.push({ pos: at, mesh, light, falling: true, life: 45 });
+  }
+
+  _updateStrikes(dt) {
+    for (let i = this.strikes.length - 1; i >= 0; i--) {
+      const s = this.strikes[i];
+      s.t -= dt;
+      if (s.t > 0) continue;
+      this.strikes.splice(i, 1);
+      const g = this.game;
+      g.effects.tracer(new THREE.Vector3(s.pos.x, 60, s.pos.z),
+        new THREE.Vector3(s.pos.x, 0.3, s.pos.z), 0xffb347);
+      g.applySplash(s.pos.clone().setY(0.4), 6, 90);
+      g.player.addShake(0.18);
+    }
+  }
+
+  _updatePackages(dt) {
+    const g = this.game;
+    for (let i = this.packages.length - 1; i >= 0; i--) {
+      const c = this.packages[i];
+      if (c.falling) {
+        c.mesh.position.y -= 12 * dt;
+        if (c.mesh.position.y <= 0.6) {
+          c.mesh.position.y = 0.6;
+          c.falling = false;
+          g.effects.impactSparks(c.pos.clone());
+          g.audio.land();
+        }
+      } else {
+        c.life -= dt;
+        c.mesh.rotation.y += dt * 0.8;
+        const p = g.player;
+        if (p.alive &&
+            Math.hypot(p.position.x - c.pos.x, p.position.z - c.pos.z) < 2.2) {
+          const roll = Math.random();
+          if (roll < 0.34) {
+            g.weapons.current.refill();
+            g.weapons.addReserveAll(2);
+            g.hud.killfeed(t('care.ammo'), 'cheat');
+          } else if (roll < 0.67) {
+            g.orbital.grant(1);
+            g.hud.killfeed(t('care.orbital'), 'cheat');
+          } else {
+            p.armor = Math.min(75, p.armor + 75);
+            g.hud.setArmor(p.armor);
+            g.weapons.addGrenade(2);
+            g.hud.killfeed(t('care.armor'), 'cheat');
+          }
+          g.audio.waveClear();
+          c.life = 0;
+        }
+        if (c.life <= 0) {
+          g.scene.remove(c.mesh);
+          g.scene.remove(c.light);
+          c.mesh.geometry.dispose();
+          c.mesh.material.dispose();
+          this.packages.splice(i, 1);
+        }
+      }
+    }
   }
 
   setRemoteBike(index, occupied) {
@@ -914,6 +1025,8 @@ export class Warfare {
 
   update(dt) {
     if (this.heli && !this.heli.update(dt)) this.heli = null;
+    this._updateStrikes(dt);
+    this._updatePackages(dt);
     const p = this.game.player;
     for (const v of this.vehicles) {
       v.tickRespawn(dt);
@@ -941,6 +1054,12 @@ export class Warfare {
   }
 
   reset() {
+    this.strikes = [];
+    for (const c of this.packages || []) {
+      this.game.scene.remove(c.mesh);
+      this.game.scene.remove(c.light);
+    }
+    this.packages = [];
     const v = this.game.player.vehicle;
     if (v) {
       v.mounted = false;

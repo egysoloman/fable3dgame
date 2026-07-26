@@ -277,7 +277,8 @@ export class HUD {
     ctx.beginPath(); ctx.moveTo(C, 4); ctx.lineTo(C, S - 4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(4, C); ctx.lineTo(S - 4, C); ctx.stroke();
 
-    const showAll = !!(this.game && this.game.cheats && this.game.cheats.is('radarAll'));
+    const showAll = !!(this.game && ((this.game.cheats && this.game.cheats.is('radarAll')) ||
+      this.game.uavTime > 0));
     const cos = Math.cos(player.yaw);
     const sin = Math.sin(player.yaw);
     const plot = (wx, wz, clampToRim) => {

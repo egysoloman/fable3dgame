@@ -184,22 +184,28 @@ export class BotPlayer {
     return _ray.intersectObjects(this.game.world.colliderMeshes, false).length === 0;
   }
 
-  // Drive the claimed hoverbike toward the current destination. Returns
-  // true while riding (the on-foot movement/combat path is skipped).
+  // Drive the claimed vehicle toward the current destination. Bikes are
+  // fast transit (hop off close-in); tanks close to mid range, hold, and
+  // fight with the turret. Returns true while riding.
   _rideVehicle(dt, g) {
     const v = this.vehicle;
     if (v.destroyed) { this._dismountVehicle(); return false; }
+    const isTank = v.type === 'tank';
     const dest = this.target ? this.target.position : this.objective;
     if (!dest) { this._dismountVehicle(); return false; }
     const dx = dest.x - this.position.x, dz = dest.z - this.position.z;
     const d = Math.hypot(dx, dz);
-    if (d < 12) { this._dismountVehicle(); return false; }
+    if (!isTank && d < 12) { this._dismountVehicle(); return false; }
     const wantYaw = Math.atan2(-dx, -dz);
     let dy = wantYaw - v.yaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     v.yaw += Math.max(-1.8 * dt, Math.min(1.8 * dt, dy));
-    v.speed = Math.min(14, v.speed + 10 * dt);
+    if (isTank && d < 18) {
+      v.speed *= Math.max(0, 1 - 2 * dt);   // hull down: hold and shoot
+    } else {
+      v.speed = Math.min(isTank ? 6 : 14, v.speed + (isTank ? 5 : 10) * dt);
+    }
     const px0 = v.position.x, pz0 = v.position.z;
     v._moveAxis('x', -Math.sin(v.yaw) * v.speed * dt);
     v._moveAxis('z', -Math.cos(v.yaw) * v.speed * dt);
@@ -211,15 +217,38 @@ export class BotPlayer {
       v.position.z = pz0;
       v.speed *= 0.3;
     }
-    // drive-by ram on the player
+    // ram anything hostile under the wheels/treads
     const p = this.game.player;
-    if (p.alive && v.speed > 8 && this.team !== 'allies' &&
-        Math.hypot(p.position.x - v.position.x, p.position.z - v.position.z) < 1.6) {
+    if (p.alive && this.team !== 'allies' &&
+        v.speed > (isTank ? 3 : 8) &&
+        Math.hypot(p.position.x - v.position.x, p.position.z - v.position.z) <
+          (isTank ? 2.6 : 1.6)) {
       p.lastBotAttacker = this.id;
-      p.takeDamage(40, v.position, 'melee');
+      p.takeDamage(isTank ? 60 : 40, v.position, 'melee');
       v.speed *= 0.5;
     }
-    this.position.set(v.position.x, v.position.y + 0.55, v.position.z);
+    // tank gunnery: turret tracks the target, cannon fires with LOS
+    if (isTank && this.target) {
+      v.turret.rotation.y = wantYaw - v.yaw;
+      this.tankGun = (this.tankGun || 0) - dt;
+      if (this.tankGun <= 0 && d < 45 && this._losTo(this.target)) {
+        this.tankGun = 3.4;
+        const from = v.position.clone();
+        from.y += 2.0;
+        const aim = new THREE.Vector3(this.target.position.x,
+          this.target.position.y + 1.2, this.target.position.z);
+        const dir = aim.sub(from).normalize();
+        from.addScaledVector(dir, 2.6);
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xffe08a }));
+        mesh.position.copy(from);
+        this.game.scene.add(mesh);
+        v.shells.push({ pos: from, vel: dir.multiplyScalar(38), life: 4, mesh });
+        this.game.audio.explosion();
+      }
+    }
+    this.position.set(v.position.x, v.position.y + (isTank ? 1.9 : 0.55), v.position.z);
     g.position.copy(this.position);
     g.rotation.y = v.yaw;
     v._sync(dt);
@@ -448,7 +477,9 @@ export class BotPlayer {
           Math.hypot(dest.x - this.position.x, dest.z - this.position.z) > 30;
         if (far) {
           for (const v of this.game.warfare.vehicles) {
-            if (v.type !== 'bike' || v.destroyed || v.mounted ||
+            const wantBike = v.type === 'bike';
+            const wantTank = v.type === 'tank' && tac.retreat; // hard tiers and up
+            if ((!wantBike && !wantTank) || v.destroyed || v.mounted ||
                 v.remoteOccupied || v.botRider) continue;
             if (Math.hypot(v.position.x - this.position.x,
                 v.position.z - this.position.z) < 6) {
