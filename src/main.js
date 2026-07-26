@@ -14,6 +14,8 @@ import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
 import { DominationManager } from './domination.js';
 import { TdmManager } from './tdm.js';
+import { CtfManager, HardpointManager, GunGameManager, SndManager,
+  InfectionManager } from './modes.js';
 import { BotMatch, DIFFICULTY } from './bots.js';
 import { Warfare, OrbitalRailgun, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
@@ -86,6 +88,11 @@ class Game {
     this.soldiers = new SoldierManager(this);
     this.domination = new DominationManager(this);
     this.tdm = new TdmManager(this);
+    this.ctf = new CtfManager(this);
+    this.hardpoint = new HardpointManager(this);
+    this.gungame = new GunGameManager(this);
+    this.snd = new SndManager(this);
+    this.infection = new InfectionManager(this);
     this.botMatch = new BotMatch(this);
     this.warfare = new Warfare(this);
     this.orbital = new OrbitalRailgun(this);
@@ -179,7 +186,7 @@ class Game {
     // Keep crouch/reload/switch combos (Ctrl+W/R/1-8...) from triggering
     // browser shortcuts, and guard against accidental tab close mid-run.
     const GAME_KEYS = new Set([
-      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'KeyE', 'KeyV', 'Space',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'KeyE', 'KeyV', 'KeyF', 'Space',
       'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8',
       'Digit9', 'Digit0',
     ]);
@@ -377,7 +384,7 @@ class Game {
         for (const d of Object.keys(DIFFICULTY)) {
           $(`diff-${d}`).classList.toggle('sel', game.setup.difficulty === d);
         }
-        for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus']) {
+        for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus', 'ctf', 'hardpoint', 'gungame', 'snd', 'infection']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
         for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory']) {
@@ -583,7 +590,7 @@ class Game {
       setLang(nextLang());
       ui.refreshText();
     });
-    for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus']) {
+    for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus', 'ctf', 'hardpoint', 'gungame', 'snd', 'infection']) {
       $(`mode-${m}`).addEventListener('click', () => { game.setup.mode = m; ui.saveSetup(); });
     }
     for (const d of Object.keys(DIFFICULTY)) {
@@ -786,11 +793,18 @@ class Game {
     this._updateFires(9999);
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
     this.matchDifficulty = this.setup.difficulty;
+    this.meleeOnlyPlayer = false;
     this.enemies = this.mode === 'strike' ? this.soldiers
       : this.mode === 'domination' ? this.domination
       : this.mode === 'tdm' ? this.tdm
+      : this.mode === 'ctf' ? this.ctf
+      : this.mode === 'hardpoint' ? this.hardpoint
+      : this.mode === 'gungame' ? this.gungame
+      : this.mode === 'snd' ? this.snd
+      : this.mode === 'infection' ? this.infection
       : this.mode === 'versus' ? this.botMatch : this.enemiesSolo;
-    for (const mgr of [this.enemiesSolo, this.soldiers, this.domination, this.botMatch]) {
+    for (const mgr of [this.enemiesSolo, this.soldiers, this.domination, this.botMatch,
+      this.tdm, this.ctf, this.hardpoint, this.gungame, this.snd, this.infection]) {
       if (mgr !== this.enemies) mgr.reset();
     }
     this._resetRunState();
@@ -843,6 +857,14 @@ class Game {
     this._finishRun();
   }
 
+  modeFinished(win) {
+    document.querySelector('#gameover-screen h1').textContent =
+      t(win ? 'strike.win' : 'strike.lose');
+    this.hud.subbanner('');
+    this.meleeOnlyPlayer = false;
+    this._finishRun();
+  }
+
   tdmFinished(win) {
     document.querySelector('#gameover-screen h1').textContent =
       t(win ? 'strike.win' : 'strike.lose');
@@ -863,7 +885,11 @@ class Game {
     this.orbital.reset();
     this._updateSmokes(9999);
     this._updateFires(9999);
-    this.soldiers.reset();
+    this.meleeOnlyPlayer = false;
+    for (const mgr of [this.soldiers, this.domination, this.botMatch, this.tdm,
+      this.ctf, this.hardpoint, this.gungame, this.snd, this.infection]) {
+      mgr.reset();
+    }
     if (mode === 'versus' || mp.isHost) {
       this.enemiesSolo.reset();
       this.enemies = this.enemiesSolo;
@@ -985,8 +1011,8 @@ class Game {
       this.enemies.onPlayerDeath();
       return;
     }
-    if ((this.mode === 'versus' || this.mode === 'domination' || this.mode === 'tdm') &&
-        !this.mp.active && !this.enemies.done) {
+    if (['versus', 'domination', 'tdm', 'ctf', 'hardpoint', 'gungame', 'snd',
+         'infection'].includes(this.mode) && !this.mp.active && !this.enemies.done) {
       // bot-team modes: credit the killer bot, then redeploy
       if (this.player.lastBotAttacker && this.enemies.creditPlayerDeath) {
         this.enemies.creditPlayerDeath(this.player.lastBotAttacker);

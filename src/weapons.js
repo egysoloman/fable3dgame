@@ -613,8 +613,29 @@ export class WeaponSystem {
   }
 
   carryIndex(cat) {
+    if (this._carryOverride) {
+      return this.weapons.findIndex((w) => w.def.id === this._carryOverride);
+    }
     return this.weapons.findIndex((w) => w.def.id === this.loadout[cat]);
   }
+
+  // Gun Game: force both carry slots to a single weapon, bypassing locks
+  overrideCarry(id) {
+    const i = this.weapons.findIndex((w) => w.def.id === id);
+    if (i < 0) return false;
+    this._carryOverride = id;
+    this.current.model.visible = false;
+    this.current.reloading = false;
+    this.index = i;
+    this.current.refill();
+    this.current.model.visible = true;
+    this.switchAnim = 1;
+    this.game.audio.weaponSwitch();
+    this.updateHud();
+    return true;
+  }
+
+  clearCarryOverride() { this._carryOverride = null; }
 
   // Enforce the loadout: locked picks fall back to defaults, the throwable
   // def is resolved, and the primary is raised.
@@ -677,6 +698,7 @@ export class WeaponSystem {
   }
 
   reset() {
+    this._carryOverride = null;
     for (const w of this.weapons) w.refill();
     this.burstQueue = 0;
     for (const ex of this.explosives) ex.dispose();
@@ -692,7 +714,8 @@ export class WeaponSystem {
   switchTo(i, silent = false) {
     if (i === this.index && !silent) return;
     if (i < 0 || i >= this.weapons.length) return;
-    if (!this.game.progression.isUnlocked(this.weapons[i].def)) {
+    if (!this.game.progression.isUnlocked(this.weapons[i].def) &&
+        this.weapons[i].def.id !== this._carryOverride) {
       if (!silent) {
         this.game.audio.empty();
         this.game.hud.killfeed(t('feed.locked', {
@@ -773,6 +796,7 @@ export class WeaponSystem {
   }
 
   throwGrenade() {
+    if (this.game.meleeOnlyPlayer) return;
     const infinite = this.game.cheats && this.game.cheats.is('infiniteGrenades');
     if ((this.grenades <= 0 && !infinite) || this.grenadeCooldown > 0) return;
     if (!infinite) this.grenades--;
@@ -811,6 +835,7 @@ export class WeaponSystem {
 
   tryFire() {
     if (this.game.player.vehicle) return;
+    if (this.game.meleeOnlyPlayer) return; // infected: claws only
     const w = this.current;
     if (w.cooldown > 0 || this.switchAnim > 0.5 || this.grenadeCooldown > 0.3) return;
     if (w.reloading) return;

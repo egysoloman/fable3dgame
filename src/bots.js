@@ -109,6 +109,8 @@ export class BotPlayer {
     this.suppressTimer = 0;
     this.vehicle = null;
     this.vehicleTimer = 5 + Math.random() * 5;
+    this.meleeOnly = false;   // infection mode: claws, no guns
+    this.speedMul = 1;
 
     const body = buildEnemyBody({ color, eyeColor: 0xffe0b0 }, true);
     this.parts = body;
@@ -480,7 +482,7 @@ export class BotPlayer {
         this.target.position.x - this.position.x, 0, this.target.position.z - this.position.z);
       dist = toT.length();
       if (dist > 0.001) toT.divideScalar(dist);
-      const pref = RANGE_PREF[this.weapon.id] || 14;
+      const pref = this.meleeOnly ? 1.2 : (RANGE_PREF[this.weapon.id] || 14);
       const lowHp = this.hp < this.maxHp * 0.35;
       if (lowHp && tac.retreat) {
         // outmatched: break contact and slide into cover to let regen work
@@ -524,7 +526,7 @@ export class BotPlayer {
       g.rotation.y = Math.atan2(toT.x, toT.z);
     }
 
-    const speed = 5.2 * this.diff.speed;
+    const speed = 5.2 * this.diff.speed * this.speedMul;
     this.velocity.x = move.x * speed;
     this.velocity.z = move.z * speed;
     this.velocity.y -= GRAVITY * (this.game.world.map.gravityMul || 1) * dt;
@@ -544,7 +546,21 @@ export class BotPlayer {
     g.position.copy(this.position);
 
     // weapon handling: real magazines, reloads, burst discipline
-    if (this.reloadTimer > 0) {
+    if (this.meleeOnly) {
+      // infected claws: close and swipe
+      this.shotTimer -= dt;
+      if (this.target && dist < 2.4 && this.shotTimer <= 0 && this.spawnTimer <= 0) {
+        this.shotTimer = 0.8;
+        this.game.audio.melee();
+        if (this.target.isPlayer) {
+          const p = this.game.player;
+          p.lastBotAttacker = this.id;
+          p.takeDamage(25, this.position, 'melee');
+        } else if (this.target.bot) {
+          this.target.bot.takeDamage(35, null, false, this.id);
+        }
+      }
+    } else if (this.reloadTimer > 0) {
       this.reloadTimer -= dt;
       if (this.reloadTimer <= 0) this.mag = this.weapon.magSize;
     } else if (this.mag <= 0) {

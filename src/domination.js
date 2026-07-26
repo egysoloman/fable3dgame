@@ -15,10 +15,11 @@ const CAP_TIME = 3;
 const COLORS = { neutral: 0x8a97a8, player: 0x27e8ff, enemy: 0xff4d4d };
 const ENEMY_SQUAD = 3;
 
-class Zone {
-  constructor(game, label, x, z) {
+export class Zone {
+  constructor(game, label, x, z, quiet = false) {
     this.game = game;
     this.label = label;
+    this.quiet = quiet;
     this.x = x;
     this.z = z;
     this.owner = 'neutral';
@@ -58,6 +59,7 @@ class Zone {
     this.owner = owner;
     this.mat.color.setHex(COLORS[owner]);
     this.light.color.setHex(COLORS[owner]);
+    if (this.quiet) return;
     const g = this.game;
     g.hud.killfeed(t(owner === 'player' ? 'dom.captured' : 'dom.lost',
       { zone: this.label }), owner === 'player' ? 'cheat' : '');
