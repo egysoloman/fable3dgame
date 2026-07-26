@@ -223,6 +223,14 @@ class Game {
       mpStatus(text) {
         $('mp-status').textContent = text || '';
       },
+      setServerStatus(state, detail) {
+        const badge = $('server-status');
+        badge.className = `status-badge ${state}`;
+        badge.textContent = t(`server.${state}`);
+        const btn = $('server-connect-btn');
+        btn.textContent = t(state === 'connected' ? 'server.disconnect' : 'server.connect');
+        if (detail === 'badAddress') ui.mpStatus(t('server.badAddress'));
+      },
       showSetup() {
         game.hud.screen('setup');
         ui.renderSetup();
@@ -250,13 +258,13 @@ class Game {
         game.state = 'menu';
         game.hud.screen('mp');
         $('name-input').value = game.mp.name;
-        ui.mpStatus(t('mp.connecting'));
-        const ok = await game.mp.connect();
+        $('server-input').value = game.mp.serverAddress;
+        ui.mpStatus('');
+        const ok = await game.mp.connect();  // reconnect to the last server
         if (!ok) {
           ui.mpStatus(t('mp.offline'));
           return;
         }
-        ui.mpStatus('');
         game.mp.listRooms();
       },
       renderRoomList(rooms) {
@@ -347,6 +355,20 @@ class Game {
       if (code.length === 4) game.mp.joinRoom(code);
     });
     $('refresh-btn').addEventListener('click', () => game.mp.listRooms());
+    $('server-connect-btn').addEventListener('click', async () => {
+      if (game.mp.connected) {
+        game.mp.disconnect();
+        return;
+      }
+      ui.mpStatus('');
+      if (!game.mp.setServerAddress($('server-input').value)) {
+        ui.setServerStatus('failed', 'badAddress');
+        return;
+      }
+      const ok = await game.mp.connect();
+      if (ok) game.mp.listRooms();
+      else ui.mpStatus(t('mp.offline'));
+    });
     $('ready-btn').addEventListener('click', () => {
       game.mp.setReady(!ui._meReady);
     });

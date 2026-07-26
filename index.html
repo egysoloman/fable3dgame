@@ -341,6 +341,19 @@
     background: var(--neon); border: none; border-radius: 3px; padding: 5px 14px;
   }
   #mp-status { min-height: 20px; margin-top: 14px; font-size: 13px; color: var(--warn); letter-spacing: 1px; }
+  #server-panel {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 18px;
+    padding: 10px 14px; border: 1px solid rgba(39, 232, 255, 0.25); border-radius: 4px;
+  }
+  #server-input { width: 240px; text-transform: none; }
+  .status-badge {
+    font-size: 11px; letter-spacing: 2px; padding: 4px 10px; border-radius: 3px;
+    border: 1px solid; white-space: nowrap;
+  }
+  .status-badge.disconnected { color: #8a97a8; border-color: #8a97a8; }
+  .status-badge.connecting { color: var(--warn); border-color: var(--warn); animation: blink 0.8s step-end infinite; }
+  .status-badge.connected { color: #4dff88; border-color: #4dff88; box-shadow: 0 0 8px rgba(77,255,136,.4); }
+  .status-badge.failed { color: var(--danger); border-color: var(--danger); }
   #lobby-players {
     width: 380px; margin: 10px 0 22px; text-align: left;
     border: 1px solid rgba(39, 232, 255, 0.25); border-radius: 4px;
@@ -464,6 +477,13 @@
 <div class="screen" id="mp-screen">
   <h2 data-i18n="mp.title"></h2>
   <div class="sub" data-i18n="mp.subtitle"></div>
+  <div id="server-panel">
+    <label class="setup-label" style="margin-top:0" data-i18n="server.label"></label>
+    <input id="server-input" class="mp-form-input" placeholder="host:port" autocomplete="off"
+      style="pointer-events:auto;font-family:inherit;font-size:14px;color:#d7faff;background:rgba(5,12,20,0.7);border:1px solid rgba(39,232,255,0.4);border-radius:3px;padding:8px 12px">
+    <button class="join-btn" id="server-connect-btn" data-i18n="server.connect"></button>
+    <span class="status-badge disconnected" id="server-status" data-i18n="server.disconnected"></span>
+  </div>
   <div class="mp-form">
     <div class="row">
       <label data-i18n="mp.nickname"></label>

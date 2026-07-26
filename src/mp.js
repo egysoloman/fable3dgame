@@ -327,6 +327,13 @@ export class Multiplayer {
     this.name = 'PLAYER';
     try { this.name = localStorage.getItem('neonstrike.name') || 'PLAYER'; } catch (e) { /* ok */ }
 
+    this.serverAddress = '';
+    try { this.serverAddress = localStorage.getItem('neonstrike.server') || ''; } catch (e) { /* ok */ }
+    if (!this.serverAddress) {
+      this.serverAddress = (typeof window !== 'undefined' && window.NEON_SERVER_ADDRESS) ||
+        location.host;
+    }
+
     this.room = null;          // latest roomState payload
     this.active = false;       // in a started match
     this.isHost = false;
@@ -364,18 +371,62 @@ export class Multiplayer {
     this.relay({ k: 'bike', i, on: on ? 1 : 0 });
   }
 
+  // Accepts host, host:port, ws://.., wss://.., http://.., https://..;
+  // scheme defaults to the page's security level, path defaults to /ws.
+  resolveWsUrl(addr) {
+    let a = (addr || '').trim();
+    if (!a) return null;
+    if (!a.includes('://')) {
+      a = (location.protocol === 'https:' ? 'wss://' : 'ws://') + a;
+    }
+    a = a.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
+    try {
+      const u = new URL(a);
+      if (!u.pathname || u.pathname === '/') u.pathname = '/ws';
+      return u.toString();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  setServerAddress(addr) {
+    const a = (addr || '').trim();
+    if (!a || this.resolveWsUrl(a) === null) return false;
+    this.serverAddress = a;
+    try { localStorage.setItem('neonstrike.server', a); } catch (e) { /* ok */ }
+    return true;
+  }
+
+  disconnect() {
+    if (this.ws) {
+      const ws = this.ws;
+      this.ws = null;
+      this.connected = false;
+      ws.onclose = null;
+      try { ws.close(); } catch (e) { /* ok */ }
+      this.room = null;
+      this.game.ui.setServerStatus('disconnected');
+    }
+  }
+
   // ---- connection ----
   connect() {
     if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) {
       return Promise.resolve(this.connected);
     }
+    const url = this.resolveWsUrl(this.serverAddress);
+    if (!url) {
+      this.game.ui.setServerStatus('failed', 'badAddress');
+      return Promise.resolve(false);
+    }
+    this.game.ui.setServerStatus('connecting');
     return new Promise((resolve) => {
       let settled = false;
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       let ws;
       try {
-        ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws = new WebSocket(url);
       } catch (e) {
+        this.game.ui.setServerStatus('failed', 'badAddress');
         resolve(false);
         return;
       }
@@ -385,6 +436,7 @@ export class Multiplayer {
       }, 4000);
       ws.onopen = () => {
         this.connected = true;
+        this.game.ui.setServerStatus('connected');
         this.send({ t: 'hello', name: this.name });
       };
       ws.onmessage = (ev) => {
@@ -400,6 +452,7 @@ export class Multiplayer {
         const wasConnected = this.connected;
         this.connected = false;
         this.ws = null;
+        this.game.ui.setServerStatus(wasConnected ? 'disconnected' : 'failed');
         if (!settled) { settled = true; clearTimeout(timeout); resolve(false); }
         if (wasConnected) this._onDisconnected();
       };

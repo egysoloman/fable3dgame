@@ -36,6 +36,15 @@ docker run -p 8080:8080 neon-strike
 Behind a TLS proxy the client automatically uses `wss://`. Serve with
 `?nocheats=1` appended to the URL you hand out to disable the dev console.
 
+**Custom server address**: the MULTIPLAYER screen has a server panel — enter
+`host:port`, a domain, or a full `ws(s)://`/`http(s)://` URL and hit CONNECT
+(status badge shows connecting/connected/failed/offline; the last-used
+address persists locally). This lets a statically-hosted frontend talk to a
+room server anywhere. Server-side environment variables: `PORT`, `HOST`
+(default `0.0.0.0`), `ALLOW_ORIGIN` (CORS, default `*`), and
+`DEFAULT_SERVER_ADDRESS` — injected into the page as the default the client
+offers first-time visitors.
+
 ## Solo without Node
 
 The frontend is fully static — any HTTP server works for single-player

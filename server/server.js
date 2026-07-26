@@ -7,6 +7,11 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8080;
+const HOST = process.env.HOST || '0.0.0.0';
+// CORS for cross-origin frontends; '*' by default, restrict via ALLOW_ORIGIN
+const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
+// Injected into index.html as the client's default server address
+const DEFAULT_SERVER_ADDRESS = process.env.DEFAULT_SERVER_ADDRESS || '';
 const ROOT = path.join(__dirname, '..');
 const MAX_PLAYERS = 4;
 const MAX_ROOMS = 200;
@@ -25,8 +30,17 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGIN);
   let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+    });
+    res.end();
+    return;
+  }
   if (urlPath === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, rooms: rooms.size, clients: clients.size }));
@@ -49,6 +63,11 @@ const server = http.createServer((req, res) => {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
     });
+    if (DEFAULT_SERVER_ADDRESS && urlPath === '/index.html') {
+      res.end(data.toString().replace('</head>',
+        `<script>window.NEON_SERVER_ADDRESS=${JSON.stringify(DEFAULT_SERVER_ADDRESS)};</script></head>`));
+      return;
+    }
     res.end(data);
   });
 });
@@ -254,6 +273,6 @@ const heartbeat = setInterval(() => {
 }, 30000);
 wss.on('close', () => clearInterval(heartbeat));
 
-server.listen(PORT, () => {
-  console.log(`NEON STRIKE server listening on http://0.0.0.0:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`NEON STRIKE server listening on http://${HOST}:${PORT}`);
 });
