@@ -10,6 +10,7 @@ and Traditional Chinese (Taiwan) — 支援繁體中文（台灣）介面.
 ![Gameplay](docs/screenshot.png)
 ![Battlefield](docs/battlefield.png)
 ![Desert](docs/desert.png)
+![Rooftop](docs/rooftop.png)
 
 ## Run the full game (server + multiplayer)
 
@@ -86,13 +87,23 @@ Clicking **SOLO** opens mission setup:
 - **Maps** — the compact **Neon Arena**, the large dusk **Sector K
   Battlefield** (bunkers, sandbag lines, watchtowers, a central hill),
   the low-gravity **Helios Station**, the naval **CVN Tempest Carrier**,
-  and the open **Amber Wastes** desert (dune plateaus, rock spires, and
-  ancient ruins). Every outdoor map wraps a procedural 360° panoramic
-  skybox — starfield, Earth and nebulae over the station, ocean, cumulus
-  and sun around the carrier, hazy noon sky over the desert, and a
-  burning dusk over the battlefield — painted onto canvas at load, no
-  texture downloads. All maps support every mode; the co-op host picks
-  the map in the lobby.
+  the open **Amber Wastes** desert (dune plateaus, rock spires, ancient
+  ruins), and the two-layer **Apex Rooftop** — a skyscraper summit with
+  a walkable penthouse roof deck over glass-walled rooms, antenna masts,
+  a helipad, and crate stairs between layers. Every outdoor map wraps a
+  procedural 360° panoramic skybox — starfield, Earth and nebulae over
+  the station, ocean, cumulus and sun around the carrier, hazy noon sky
+  over the desert, a burning dusk over the battlefield, and rings of
+  lit high-rises over a cloud sea around the rooftop — painted onto
+  canvas at load, no texture downloads. All maps support every mode;
+  the co-op host picks the map in the lobby.
+- **Open edges** — not every map is walled. The carrier deck and the
+  rooftop have real edges: step off and you fall to your death (the
+  ocean, or the streets far below). The desert has no walls at all —
+  leaving the mission area starts a 5-second return countdown before
+  you're gone. The carrier's bridge tower is a full multi-level climb
+  with observation decks, a radar mast, and sniping positions over the
+  flight deck.
 - **Equipment (pick 2)** — **Armor Plates** (blue armor pool absorbs
   damage, refilled by ammo cells and resupply drops), **Combat Helmet**
   (-40% explosive / -25% gunfire damage), **Stim Injector** (faster

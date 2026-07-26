@@ -325,6 +325,10 @@ export class BotPlayer {
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
     if (this.position.y <= 0) { this.position.y = 0; if (this.velocity.y < 0) this.velocity.y = 0; }
+    // bots never step off open-edge maps
+    const lim = this.game.world.half - 1;
+    this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
+    this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
     g.position.copy(this.position);
 
     // weapon handling: real magazines, reloads, burst discipline

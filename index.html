@@ -125,6 +125,14 @@
     text-shadow: 0 0 10px #9dff6a; display: none;
   }
   #vehicle-hp.visible { display: block; }
+  #oob-warning {
+    position: absolute; left: 50%; top: 30%; transform: translateX(-50%);
+    font-size: 20px; letter-spacing: 4px; color: #ff5a4d;
+    text-shadow: 0 0 14px #ff5a4d; display: none;
+    animation: oob-pulse 0.8s ease-in-out infinite;
+  }
+  #oob-warning.visible { display: block; }
+  @keyframes oob-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
   .pick-row { display: flex; gap: 12px; margin: 8px 0 4px; flex-wrap: wrap; justify-content: center; }
   .pick {
     pointer-events: auto; cursor: pointer; font-family: inherit;
@@ -438,6 +446,7 @@
   <div id="spectate-note" data-i18n="mp.spectating"></div>
   <div id="mount-hint" data-i18n="vehicle.hint"></div>
   <div id="vehicle-hp"></div>
+  <div id="oob-warning"></div>
 </div>
 
 <button id="lang-btn">繁體中文</button>
@@ -477,6 +486,7 @@
     <button class="pick" id="map-station" data-i18n="map.station"></button>
     <button class="pick" id="map-carrier" data-i18n="map.carrier"></button>
     <button class="pick" id="map-desert" data-i18n="map.desert"></button>
+    <button class="pick" id="map-rooftop" data-i18n="map.rooftop"></button>
   </div>
   <div class="setup-label" data-i18n="setup.attach"></div>
   <div class="pick-row">

@@ -42,6 +42,7 @@ export class Player {
     this.shakeMag = 0;
     this.vehicle = null;
     this.armor = 0;
+    this.oobTimer = 0;
 
     this.keys = new Set();
 
@@ -88,6 +89,8 @@ export class Player {
     this.crouchAmount = 0;
     this.timeSinceDamage = 999;
     this.shakeTime = 0;
+    this.oobTimer = 0;
+    this.game.hud.setOob(null);
     this.keys.clear();
     this.syncCamera(0);
   }
@@ -171,16 +174,37 @@ export class Player {
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
 
-    // floor
-    if (this.position.y <= 0) {
+    // floor — on open-edge maps there is no ground beyond the footprint
+    const world = this.game.world;
+    if (this.position.y <= 0 && world.groundAt(this.position.x, this.position.z)) {
       this.position.y = 0;
       if (this.velocity.y < 0) this.velocity.y = 0;
       this.grounded = true;
     }
-    // hard arena bounds as a safety net
-    const lim = this.game.world.half - 0.6;
-    this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
-    this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
+    const edge = world.map.edge || 'walls';
+    if (edge === 'walls') {
+      // hard arena bounds as a safety net
+      const lim = world.half - 0.6;
+      this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
+      this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
+    } else if (edge === 'fall' && this.position.y < -9 && this.alive) {
+      this.takeDamage(99999, null, 'fall');
+    } else if (edge === 'oob' && this.alive) {
+      // out of the mission area: countdown, then you're gone
+      const out = Math.abs(this.position.x) > world.half ||
+        Math.abs(this.position.z) > world.half;
+      if (out) {
+        this.oobTimer += dt;
+        this.game.hud.setOob(Math.max(0, 5 - this.oobTimer));
+        if (this.oobTimer >= 5) {
+          this.game.hud.setOob(null);
+          this.takeDamage(99999, null, 'oob');
+        }
+      } else if (this.oobTimer > 0) {
+        this.oobTimer = 0;
+        this.game.hud.setOob(null);
+      }
+    }
 
     if (this.grounded && !this.wasGrounded) {
       this.landBump = 0.14;
@@ -285,8 +309,10 @@ export class Player {
 
   takeDamage(amount, sourcePos = null, dmgType = 'melee') {
     if (!this.alive || this.game.godMode) return;
-    // enclosed vehicles (tank, gunship) soak damage into their hull
-    if (this.vehicle && this.vehicle.enclosed && !this.vehicle.destroyed) {
+    // enclosed vehicles (tank, gunship) soak damage into their hull —
+    // but not against falls or the out-of-bounds countdown
+    if (this.vehicle && this.vehicle.enclosed && !this.vehicle.destroyed &&
+        dmgType !== 'fall' && dmgType !== 'oob') {
       this.vehicle.takeDamage(amount);
       return;
     }

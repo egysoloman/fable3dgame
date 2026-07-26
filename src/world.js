@@ -200,6 +200,53 @@ const SKY_PAINTERS = {
     paintClouds(g, w, [h * 0.1, h * 0.24], 5, rand, 0.4);
   },
 
+  // skyscraper dusk: rings of distant towers over a sea of clouds
+  city(g, w, h) {
+    const rand = mulberry32(6060);
+    skyGradient(g, w, h, [
+      [0, '#141c30'], [0.28, '#2e4468'], [0.4, '#7a5a78'], [0.48, '#d8886a'],
+      [0.52, '#b8c2d2'], [0.66, '#a8b4c4'], [1, '#8a98a8'],
+    ]);
+    paintSun(g, w * 0.78, h * 0.45, 16, '#ffd8a0', 'rgba(255,190,120,0.5)');
+    // three depth layers of high-rise silhouettes with lit windows
+    const layers = [
+      { rise: 0.13, alpha: 0.4, tone: '#3a4a66', lit: 0.25 },
+      { rise: 0.17, alpha: 0.7, tone: '#242f4a', lit: 0.4 },
+      { rise: 0.22, alpha: 1.0, tone: '#101828', lit: 0.6 },
+    ];
+    for (const L of layers) {
+      let x = -rand() * 20;
+      while (x < w) {
+        const bw = 16 + rand() * 38;
+        const bh = h * L.rise * (0.45 + rand() * 0.9);
+        const by = h * 0.52 - bh;
+        g.globalAlpha = L.alpha;
+        g.fillStyle = L.tone;
+        g.fillRect(x, by, bw, bh + h * 0.06);
+        g.fillStyle = '#ffd890';
+        const nWin = Math.floor((bw * bh) / 260);
+        for (let i = 0; i < nWin; i++) {
+          if (rand() > L.lit) continue;
+          g.fillRect(x + 2 + rand() * (bw - 5), by + 3 + rand() * (bh - 4), 1.6, 2.4);
+        }
+        x += bw + 3 + rand() * 12;
+      }
+    }
+    g.globalAlpha = 1;
+    // cloud sea hiding the streets far below
+    const sea = g.createLinearGradient(0, h * 0.54, 0, h * 0.7);
+    sea.addColorStop(0, 'rgba(226,232,242,0.0)');
+    sea.addColorStop(0.4, 'rgba(226,232,242,0.9)');
+    sea.addColorStop(1, 'rgba(200,210,224,1)');
+    g.fillStyle = sea;
+    g.fillRect(0, h * 0.54, w, h * 0.46);
+    paintClouds(g, w, [h * 0.56, h * 0.68], 22, rand, 0.9);
+    for (let i = 0; i < 90; i++) { // early stars
+      g.fillStyle = `rgba(255,245,255,${0.2 + rand() * 0.4})`;
+      g.fillRect(rand() * w, rand() * h * 0.14, 1.3, 1.3);
+    }
+  },
+
   // battlefield dusk: burning gradient, low sun, streak clouds
   dusk(g, w, h) {
     const rand = mulberry32(2222);
@@ -390,6 +437,9 @@ export const MAPS = {
     id: 'carrier',
     size: 120,
     sky: 'ocean',
+    edge: 'fall',        // open deck: falling off means the ocean
+    outerY: -16,
+    outerColor: 0x0a2a44,
     fog: [0x0a1420, 40, 190],
     bg: 0x0a1420,
     hemi: [0x9fc4e0, 0x2a3e50, 1.25],
@@ -406,15 +456,26 @@ export const MAPS = {
       const S = this.size;
       // "ocean" tint outside the deck happens via the dark outer plane; add
       // deck edge rails (low, non-climb-over aesthetic barriers)
-      // island superstructure: stacked, climbable tiers on the starboard side
-      w.addBox(34, 2.5, -8, 10, 5, 8, w.mats.bunker);
-      w.addBox(34, 6.2, -8, 7, 2.4, 6, w.mats.bunker);
-      w.addBox(36, 8.6, -8, 4, 2.4, 4, w.mats.pillar);
+      // bridge tower: a tall, climbable multi-level command island with
+      // observation decks that overlook the whole flight deck
+      w.addBox(34, 2.5, -8, 10, 5, 8, w.mats.bunker);      // base block
+      w.addBox(34, 6.2, -8, 7, 2.4, 6, w.mats.bunker);     // bridge level
+      w.addBox(36, 8.6, -8, 4, 2.4, 4, w.mats.pillar);     // control level
+      w.addBox(36, 11.0, -8, 3, 2.4, 3, w.mats.pillar);    // observation top
       w.addTrim(34, 5.1, -8, 10.2, 0.2, 8.2);
+      w.addTrim(34, 7.5, -8, 7.2, 0.2, 6.2);
       w.addTrim(36, 9.9, -8, 4.2, 0.2, 4.2);
-      // stairs of crates up the island
+      w.addTrim(36, 12.3, -8, 3.2, 0.2, 3.2);
+      // radar mast + antenna arrays
+      w.addBox(36, 14.0, -8, 0.4, 3.6, 0.4, w.mats.pillar);
+      w.addTrim(36, 15.9, -8, 2.6, 0.12, 0.3);
+      w.addTrim(36, 15.2, -8, 0.3, 0.12, 2.2);
+      // crate stairs winding up the island, one hop per landing
       w.addBox(27.5, 0.7, -8, 3, 1.4, 3, w.mats.container);
       w.addBox(30.5, 1.9, -8, 3, 3.8, 3, w.mats.container);
+      w.addBox(31, 5.7, -10.4, 2, 1.4, 2, w.mats.container);
+      w.addBox(32, 8.1, -6.4, 2, 1.4, 2, w.mats.container);
+      w.addBox(37.2, 10.5, -6.2, 1.6, 1.4, 1.6, w.mats.container);
 
       // parked jets: fuselage + wing blocks, good hard cover
       const jets = [[-20, -30, 0], [-2, -36, 1], [16, -28, 0]];
@@ -449,6 +510,7 @@ export const MAPS = {
     id: 'desert',
     size: 150,
     sky: 'desert',
+    edge: 'oob',         // no walls: leaving the zone starts a countdown
     fog: [0xd8c49a, 50, 240],
     bg: 0xd8c49a,
     hemi: [0xffe8c0, 0xa8895a, 1.45],
@@ -505,6 +567,72 @@ export const MAPS = {
       w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
     },
   },
+
+  rooftop: {
+    id: 'rooftop',
+    size: 100,
+    sky: 'city',
+    edge: 'fall',        // no railings up here
+    outerY: -60,
+    outerColor: 0xb8c4d0, // the cloud sea far below
+    fog: [0x9aa8b8, 42, 220],
+    bg: 0x9aa8b8,
+    hemi: [0xffc890, 0x2a3448, 1.15],
+    sun: [0xffd8a0, 1.45],
+    floorColors: ['#3a3f4a', '#4a5262', '#8a94a8'],
+    accents: [
+      [-34, 0xffcf3b, -34], [34, 0x27e8ff, -34], [-34, 0xff3bd4, 34], [34, 0xffb347, 34],
+    ],
+    playerSpawn: [0, 38],
+    domPoints: [[-30, -20], [30, 10], [0, 26]],
+    vehicles: [[-30, 30, 0.5], [30, 30, -0.5], [0, -36, 3.14, 'heli']],
+    build(w) {
+      const rand = mulberry32(8181);
+      // penthouse block: glass-walled rooms under a walkable roof deck.
+      // Upper layer = the roof slab; lower layer = the terrace around it.
+      const PH = 4.2;                                     // penthouse wall height
+      w.addBox(0, PH / 2, -8.5, 36, PH, 1, w.mats.pillar);   // north wall
+      w.addBox(0, PH / 2, 8.5, 36, PH, 1, w.mats.pillar);    // south wall
+      w.addBox(-17.5, PH / 2, -3, 1, PH, 12, w.mats.pillar); // west wall (door gap south)
+      w.addBox(17.5, PH / 2, 3, 1, PH, 12, w.mats.pillar);   // east wall (door gap north)
+      w.addBox(-6, PH / 2, 0, 1, PH, 10, w.mats.bunker);     // interior dividers
+      w.addBox(7, PH / 2, -2, 8, PH, 1, w.mats.bunker);
+      w.addBox(0, PH + 0.25, 0, 36, 0.5, 18, w.mats.bunker); // roof deck slab
+      w.addTrim(0, PH + 0.55, 0, 36.2, 0.15, 18.2);
+      // crate stairs up to the roof deck at two corners
+      w.addBox(-21, 0.6, 11, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(-19, 1.8, 13.5, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(-16, 3.0, 11.5, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(21, 0.6, -11, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(19, 1.8, -13.5, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(16, 3.0, -11.5, 2.4, 1.2, 2.4, w.mats.crate);
+      // rooftop furniture on the slab: antenna masts + HVAC units
+      w.addBox(-12, PH + 0.5 + 3.2, -4, 0.5, 6.4, 0.5, w.mats.pillar);
+      w.addTrim(-12, PH + 7.4, -4, 1.8, 0.1, 0.25);
+      w.addBox(12, PH + 0.5 + 2.4, 4, 0.5, 4.8, 0.5, w.mats.pillar);
+      w.addBox(-2, PH + 0.5 + 0.8, 4.5, 3, 1.6, 2.2, w.mats.container);
+      w.addBox(6, PH + 0.5 + 0.8, -4.5, 3, 1.6, 2.2, w.mats.container);
+      // terrace props: elevator housing, HVAC, dishes, glass deck rail
+      w.addBox(-28, 2.2, -12, 6, 4.4, 5, w.mats.bunker);     // elevator shaft
+      w.addBox(28, 1.2, 16, 4, 2.4, 3, w.mats.container);    // HVAC
+      w.addBox(-14, 1.2, 24, 3, 2.4, 3, w.mats.container);
+      w.addBox(24, 0.9, -22, 2.6, 1.8, 2.6, w.mats.crate);   // dish bases
+      w.addBox(-30, 0.9, 14, 2.6, 1.8, 2.6, w.mats.crate);
+      w.addTrim(0, 0.5, -36, 10, 0.1, 10.2);                 // helipad marking
+      // scattered crates for terrace cover
+      for (let i = 0; i < 10; i++) {
+        const x = (rand() - 0.5) * (this.size - 16);
+        const z = (rand() - 0.5) * (this.size - 16);
+        if (Math.abs(x) < 22 && Math.abs(z) < 13) continue;  // keep penthouse clear
+        if (Math.hypot(x - 0, z - 38) < 8) continue;
+        if (Math.hypot(x - 0, z + 36) < 7) continue;
+        if (this.vehicles.some(([vx, vz]) => Math.hypot(x - vx, z - vz) < 5)) continue;
+        const s = 1.4 + rand() * 1.6;
+        w.addBox(x, 0.7, z, s, 1.4, s, w.mats.crate);
+      }
+      w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
+    },
+  },
 };
 
 export class World {
@@ -523,6 +651,13 @@ export class World {
 
   get size() { return this.map.size; }
   get half() { return this.map.size / 2; }
+
+  // On open-edge 'fall' maps the ground only exists inside the footprint;
+  // step past it and there is nothing below you.
+  groundAt(x, z) {
+    if (this.map.edge !== 'fall') return true;
+    return Math.abs(x) <= this.half && Math.abs(z) <= this.half;
+  }
 
   _buildGlobalLights() {
     this.hemi = new THREE.HemisphereLight(0x3a5f8a, 0x0c1018, 0.9);
@@ -662,14 +797,17 @@ export class World {
     this.root.add(floor);
     this.colliderMeshes.push(floor);
 
-    const outerMat = new THREE.MeshStandardMaterial({ color: map.bg, roughness: 1 });
+    // open-edge maps drop the surroundings far below (ocean, cloud sea)
+    const outerMat = new THREE.MeshStandardMaterial({
+      color: map.outerColor !== undefined ? map.outerColor : map.bg, roughness: 1 });
     const outer = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), outerMat);
     outer.rotation.x = -Math.PI / 2;
-    outer.position.y = -0.02;
+    outer.position.y = map.outerY !== undefined ? map.outerY : -0.02;
     this.root.add(outer);
   }
 
   _buildWalls() {
+    if (this.map.edge && this.map.edge !== 'walls') return; // open horizon
     const half = this.half;
     const size = this.map.size;
     const panelTex = makePanelTexture();

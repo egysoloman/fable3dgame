@@ -257,6 +257,10 @@ class Enemy {
       this.position.y = 0;
       if (this.velocity.y < 0) this.velocity.y = 0;
     }
+    // stay on the map on open-edge layouts
+    const edgeLim = this.game.world.half - 1;
+    this.position.x = Math.max(-edgeLim, Math.min(edgeLim, this.position.x));
+    this.position.z = Math.max(-edgeLim, Math.min(edgeLim, this.position.z));
 
     // stuck detection
     const wanted = this.speed * dt;
