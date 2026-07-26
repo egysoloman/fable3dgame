@@ -105,6 +105,33 @@
     height: 100%; width: 100%; background: var(--neon);
     box-shadow: 0 0 8px var(--neon); transition: width 0.15s ease-out;
   }
+  #armor-track {
+    margin-top: 4px; height: 5px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden;
+  }
+  #armor-bar {
+    height: 100%; width: 0; background: #6aa8ff;
+    box-shadow: 0 0 8px #6aa8ff; transition: width 0.15s ease-out;
+  }
+  #mount-hint {
+    position: absolute; left: 50%; top: 64%; transform: translateX(-50%);
+    font-size: 15px; letter-spacing: 3px; color: var(--warn);
+    text-shadow: 0 0 10px var(--warn); display: none;
+  }
+  #mount-hint.visible { display: block; }
+  .pick-row { display: flex; gap: 12px; margin: 8px 0 4px; flex-wrap: wrap; justify-content: center; }
+  .pick {
+    pointer-events: auto; cursor: pointer; font-family: inherit;
+    font-size: 14px; letter-spacing: 2px; color: #8fd8e6;
+    background: rgba(5, 12, 20, 0.6); border: 1px solid rgba(39, 232, 255, 0.35);
+    border-radius: 3px; padding: 10px 20px;
+  }
+  .pick.sel {
+    color: #05121a; background: var(--neon);
+    box-shadow: 0 0 14px rgba(39, 232, 255, 0.7);
+  }
+  .pick small { display: block; font-size: 10px; letter-spacing: 1px; margin-top: 3px; }
+  .setup-label { font-size: 12px; letter-spacing: 3px; color: var(--neon-dim); margin-top: 18px; }
   #health-panel.hurt #health-bar { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
   #health-panel.hurt #health-value { color: var(--danger); }
 
@@ -361,6 +388,7 @@
     <div id="health-label" data-i18n="hud.integrity"></div>
     <div id="health-value">100</div>
     <div id="health-bar-track"><div id="health-bar"></div></div>
+    <div id="armor-track"><div id="armor-bar"></div></div>
   </div>
 
   <div class="panel" id="ammo-panel">
@@ -389,6 +417,7 @@
   <div id="banner"></div>
   <div id="subbanner"></div>
   <div id="spectate-note" data-i18n="mp.spectating"></div>
+  <div id="mount-hint" data-i18n="vehicle.hint"></div>
 </div>
 
 <button id="lang-btn">繁體中文</button>
@@ -403,6 +432,31 @@
   </div>
   <div class="controls" data-i18n-html="menu.controls"></div>
   <div class="arsenal" id="arsenal"></div>
+</div>
+
+<div class="screen" id="setup-screen">
+  <h2 data-i18n="setup.title"></h2>
+  <div class="setup-label" data-i18n="setup.mode"></div>
+  <div class="pick-row">
+    <button class="pick" id="mode-survival"><span data-i18n="mode.survival"></span><small data-i18n="mode.survival.d"></small></button>
+    <button class="pick" id="mode-strike"><span data-i18n="mode.strike"></span><small data-i18n="mode.strike.d"></small></button>
+  </div>
+  <div class="setup-label" data-i18n="setup.map"></div>
+  <div class="pick-row">
+    <button class="pick" id="map-arena" data-i18n="map.arena"></button>
+    <button class="pick" id="map-battlefield" data-i18n="map.battlefield"></button>
+  </div>
+  <div class="setup-label" data-i18n="setup.equip"></div>
+  <div class="pick-row">
+    <button class="pick" id="eq-plates"><span data-i18n="equip.plates"></span><small data-i18n="equip.plates.d"></small></button>
+    <button class="pick" id="eq-helmet"><span data-i18n="equip.helmet"></span><small data-i18n="equip.helmet.d"></small></button>
+    <button class="pick" id="eq-stim"><span data-i18n="equip.stim"></span><small data-i18n="equip.stim.d"></small></button>
+    <button class="pick" id="eq-boots"><span data-i18n="equip.boots"></span><small data-i18n="equip.boots.d"></small></button>
+  </div>
+  <div class="btn-row" style="margin-top:26px">
+    <button class="btn" id="deploy-btn" data-i18n="setup.deploy"></button>
+    <button class="btn secondary" id="setup-back-btn" data-i18n="mp.back"></button>
+  </div>
 </div>
 
 <div class="screen" id="mp-screen">
@@ -432,6 +486,10 @@
   <div id="lobby-code"></div>
   <div class="sub" data-i18n="mp.players"></div>
   <div id="lobby-players"></div>
+  <div id="lobby-map-row" style="margin-bottom:16px">
+    <span class="setup-label" data-i18n="setup.map"></span>
+    <button class="pick" id="lobby-map-btn" style="margin-left:10px"></button>
+  </div>
   <div class="btn-row">
     <button class="btn" id="ready-btn" data-i18n="mp.ready"></button>
     <button class="btn" id="start-match-btn" data-i18n="mp.start"></button>

@@ -42,6 +42,8 @@ export class HUD {
       rankValue: document.getElementById('rank-value'),
       menuRank: document.getElementById('menu-rank'),
       arsenal: document.getElementById('arsenal'),
+      armorBar: document.getElementById('armor-bar'),
+      mountHint: document.getElementById('mount-hint'),
     };
     this.game = null; // bound by Game after construction
     this.radarCtx = document.getElementById('radar').getContext('2d');
@@ -67,6 +69,15 @@ export class HUD {
     document.getElementById('mp-screen').classList.toggle('visible', name === 'mp');
     document.getElementById('lobby-screen').classList.toggle('visible', name === 'lobby');
     document.getElementById('mpover-screen').classList.toggle('visible', name === 'mpover');
+    document.getElementById('setup-screen').classList.toggle('visible', name === 'setup');
+  }
+
+  setArmor(v) {
+    this.el.armorBar.style.width = `${Math.max(0, Math.min(100, (v / 75) * 100))}%`;
+  }
+
+  setMountHint(on) {
+    this.el.mountHint.classList.toggle('visible', on);
   }
 
   setHealth(hp, maxHp) {
@@ -97,7 +108,8 @@ export class HUD {
   renderArsenal() {
     if (!this.game) return;
     const prog = this.game.progression;
-    const defs = this.game.weapons.weapons.map((w) => w.def);
+    const defs = this.game.weapons.weapons.map((w) => w.def)
+      .filter((d) => !d.streakOnly);
     const parts = defs.map((d, i) => {
       const name = t(`weapon.${d.id}`);
       return prog.isUnlocked(d)
@@ -105,8 +117,8 @@ export class HUD {
         : `<span class="locked">${t('menu.locked', { weapon: name, need: d.unlockRank })}</span>`;
     });
     this.el.arsenal.innerHTML =
-      `${t('menu.arsenal')}: ` + parts.slice(0, 4).join(' &middot; ') + '<br>' +
-      parts.slice(4).join(' &middot; ');
+      `${t('menu.arsenal')}: ` + parts.slice(0, 5).join(' &middot; ') + '<br>' +
+      parts.slice(5).join(' &middot; ');
 
     const next = prog.nextUnlock(defs);
     this.el.menuRank.textContent = next

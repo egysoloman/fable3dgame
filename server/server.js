@@ -203,7 +203,8 @@ wss.on('connection', (ws) => {
         }
         if (!allReady) { send(id, { t: 'error', code: 'notReady' }); break; }
         room.started = true;
-        broadcastRoom(room, { t: 'started', hostId: room.hostId });
+        room.map = typeof msg.map === 'string' ? msg.map.slice(0, 20) : 'arena';
+        broadcastRoom(room, { t: 'started', hostId: room.hostId, map: room.map });
         broadcastRoom(room, roomStatePayload(room));
         break;
       }

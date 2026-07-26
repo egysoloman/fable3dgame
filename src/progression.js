@@ -63,6 +63,9 @@ export class Progression {
   }
 
   isUnlocked(def) {
+    if (def.streakOnly) {
+      return !!(this.game.weapons && this.game.weapons.railgunActive);
+    }
     if (this.game.cheats && this.game.cheats.is('unlockAll')) return true;
     return (def.unlockRank || 1) <= this.rank;
   }
@@ -78,6 +81,7 @@ export class Progression {
   // first still-locked weapon, for "next unlock" hints
   nextUnlock(defs) {
     const locked = defs
+      .filter((d) => !d.streakOnly)
       .filter((d) => (d.unlockRank || 1) > this.realRank)
       .sort((a, b) => a.unlockRank - b.unlockRank);
     return locked[0] || null;

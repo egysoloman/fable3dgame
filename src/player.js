@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { ARENA_SIZE } from './world.js';
 
 const EYE_STAND = 1.62;
 const EYE_CROUCH = 1.12;
@@ -41,6 +40,8 @@ export class Player {
     this.timeSinceDamage = 999;
     this.shakeTime = 0;
     this.shakeMag = 0;
+    this.vehicle = null;
+    this.armor = 0;
 
     this.keys = new Set();
 
@@ -67,12 +68,16 @@ export class Player {
   }
 
   reset() {
-    this.position.set(0, 0, 10);
+    const sp = this.game.world.map.playerSpawn;
+    this.position.set(sp[0], 0, sp[1]);
     this.velocity.set(0, 0, 0);
     this.yaw = 0;
     this.pitch = 0;
     this.maxHp = this.game.progression ? this.game.progression.maxHp() : MAX_HP;
     this.hp = this.maxHp;
+    this.vehicle = null;
+    this.armor = this.game.hasEquip && this.game.hasEquip('plates') ? 50 : 0;
+    this.game.hud.setArmor(this.armor);
     this.alive = true;
     this.grounded = false;
     this.crouchToggle = false;
@@ -100,7 +105,7 @@ export class Player {
   }
 
   update(dt) {
-    if (!this.alive) return;
+    if (!this.alive || this.vehicle) return;
 
     // --- input ---
     const fwd = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
@@ -124,8 +129,9 @@ export class Player {
     const moveMul = (weapons ? weapons.current.def.moveMul : 1) *
       (1 - (weapons ? weapons.adsAmount : 0) * 0.25) *
       (1 - this.crouchAmount * 0.45);
-    const sprintSpeed = SPRINT_SPEED * this.game.progression.sprintMul();
-    const maxSpeed = (this.sprinting ? sprintSpeed : WALK_SPEED) * moveMul;
+    const boots = this.game.hasEquip && this.game.hasEquip('boots') ? 1.08 : 1;
+    const sprintSpeed = SPRINT_SPEED * this.game.progression.sprintMul() * boots;
+    const maxSpeed = (this.sprinting ? sprintSpeed : WALK_SPEED * boots) * moveMul;
 
     // --- horizontal velocity: friction + acceleration ---
     const hv = new THREE.Vector3(this.velocity.x, 0, this.velocity.z);
@@ -145,7 +151,8 @@ export class Player {
 
     // --- jump & gravity ---
     if (this.keys.has('Space') && this.grounded) {
-      this.velocity.y = JUMP_SPEED;
+      this.velocity.y = JUMP_SPEED *
+        (this.game.hasEquip && this.game.hasEquip('boots') ? 1.05 : 1);
       this.grounded = false;
       this.crouchToggle = false;
       this.game.audio.jump();
@@ -166,7 +173,7 @@ export class Player {
       this.grounded = true;
     }
     // hard arena bounds as a safety net
-    const lim = ARENA_SIZE / 2 - 0.6;
+    const lim = this.game.world.half - 0.6;
     this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
     this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
 
@@ -175,10 +182,13 @@ export class Player {
       this.game.audio.land();
     }
 
-    // --- health regen ---
+    // --- health regen (STIM shortens the delay and speeds it up) ---
     this.timeSinceDamage += dt;
-    if (this.timeSinceDamage > REGEN_DELAY && this.hp < this.maxHp) {
-      this.hp = Math.min(this.maxHp, this.hp + REGEN_RATE * dt);
+    const stim = this.game.hasEquip && this.game.hasEquip('stim');
+    const regenDelay = stim ? 2.5 : REGEN_DELAY;
+    const regenRate = REGEN_RATE * (stim ? 1.5 : 1);
+    if (this.timeSinceDamage > regenDelay && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + regenRate * dt);
       this.game.hud.setHealth(this.hp, this.maxHp);
     }
 
@@ -268,8 +278,20 @@ export class Player {
     }
   }
 
-  takeDamage(amount, sourcePos = null) {
+  takeDamage(amount, sourcePos = null, dmgType = 'melee') {
     if (!this.alive || this.game.godMode) return;
+    // COMBAT HELMET blunts explosions and incoming fire
+    if (this.game.hasEquip && this.game.hasEquip('helmet')) {
+      if (dmgType === 'splash') amount *= 0.6;
+      else if (dmgType === 'bullet' || dmgType === 'bolt') amount *= 0.75;
+    }
+    // ARMOR PLATES absorb before health
+    if (this.armor > 0) {
+      const absorbed = Math.min(this.armor, amount * 0.7);
+      this.armor -= absorbed;
+      amount -= absorbed;
+      this.game.hud.setArmor(this.armor);
+    }
     this.hp -= amount;
     this.timeSinceDamage = 0;
     this.game.resetStreak();

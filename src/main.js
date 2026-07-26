@@ -10,6 +10,8 @@ import { HUD } from './hud.js';
 import { Progression, PERKS } from './progression.js';
 import { CheatSystem } from './cheats.js';
 import { Multiplayer } from './mp.js';
+import { SoldierManager } from './soldiers.js';
+import { Warfare, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, applyDom } from './i18n.js';
 
 const BEST_KEY = 'neonstrike.best';
@@ -19,11 +21,14 @@ const SETTINGS_KEY = 'neonstrike.settings';
 const CHEATS_ENABLED = new URLSearchParams(location.search).get('nocheats') !== '1';
 
 const STREAK_REWARDS = {
-  5: { bonus: 250 },
+  5: { bonus: 250, resupply: true, key: 'streakr.resupply' },
+  7: { bonus: 400, railgun: true, key: 'streakr.railgun' },
   10: { bonus: 750, refill: true },
+  12: { bonus: 1000, heli: true, key: 'streakr.heli' },
   15: { bonus: 2000, refill: true },
   20: { bonus: 4000, refill: true },
 };
+const SETUP_KEY = 'neonstrike.setup';
 
 class Game {
   constructor() {
@@ -71,6 +76,15 @@ class Game {
     this.pickups = new PickupManager(this);
     this.cheats = new CheatSystem(this, CHEATS_ENABLED);
     this.mp = new Multiplayer(this);
+    this.soldiers = new SoldierManager(this);
+    this.warfare = new Warfare(this);
+    this.mode = 'survival';
+    this.setup = { mode: 'survival', map: 'arena', equip: loadEquip() };
+    try {
+      const st = JSON.parse(localStorage.getItem(SETUP_KEY) || '{}');
+      if (st.mode) this.setup.mode = st.mode;
+      if (st.map) this.setup.map = st.map;
+    } catch (e) { /* defaults */ }
     this.ui = this._buildUi();
 
     this.weapons.rig.visible = false;
@@ -101,8 +115,14 @@ class Game {
     document.getElementById('start-btn').addEventListener('click', () => {
       this.audio.init();
       this.applyVolume();
+      this.ui.showSetup();
+    });
+    document.getElementById('deploy-btn').addEventListener('click', () => {
       this.startRun();
       this.requestLock();
+    });
+    document.getElementById('setup-back-btn').addEventListener('click', () => {
+      this.ui.showMenu();
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
       this.audio.init();
@@ -143,8 +163,9 @@ class Game {
     // Keep crouch/reload/switch combos (Ctrl+W/R/1-8...) from triggering
     // browser shortcuts, and guard against accidental tab close mid-run.
     const GAME_KEYS = new Set([
-      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'Space',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyG', 'KeyC', 'KeyE', 'Space',
       'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8',
+      'Digit9', 'Digit0',
     ]);
     window.addEventListener('keydown', (e) => {
       if (this.playing && GAME_KEYS.has(e.code)) e.preventDefault();
@@ -199,6 +220,29 @@ class Game {
       },
       mpStatus(text) {
         $('mp-status').textContent = text || '';
+      },
+      showSetup() {
+        game.hud.screen('setup');
+        ui.renderSetup();
+      },
+      renderSetup() {
+        for (const m of ['survival', 'strike']) {
+          $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
+        }
+        for (const m of ['arena', 'battlefield']) {
+          $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
+        }
+        for (const eq of EQUIP_DEFS) {
+          $(`eq-${eq}`).classList.toggle('sel', game.setup.equip.includes(eq));
+        }
+      },
+      saveSetup() {
+        try {
+          localStorage.setItem(SETUP_KEY,
+            JSON.stringify({ mode: game.setup.mode, map: game.setup.map }));
+        } catch (e) { /* ok */ }
+        saveEquip(game.setup.equip);
+        ui.renderSetup();
       },
       async openMultiplayer() {
         game.state = 'menu';
@@ -272,6 +316,8 @@ class Game {
           wrap.appendChild(row);
         }
         const amHost = room.hostId === game.mp.myId;
+        $('lobby-map-row').style.display = amHost ? '' : 'none';
+        $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
         $('ready-btn').style.display = amHost ? 'none' : '';
         $('ready-btn').textContent = meReady ? t('mp.unready') : t('mp.ready');
         $('start-match-btn').style.display = amHost ? '' : 'none';
@@ -304,7 +350,7 @@ class Game {
     $('start-match-btn').addEventListener('click', () => {
       game.audio.init();
       game.applyVolume();
-      game.mp.requestStart();
+      game.mp.requestStart(game.setup.map);
     });
     $('leave-lobby-btn').addEventListener('click', () => {
       game.mp.leaveRoom();
@@ -314,6 +360,30 @@ class Game {
     $('lang-btn').addEventListener('click', () => {
       setLang(getLang() === 'en' ? 'zh-TW' : 'en');
       ui.refreshText();
+    });
+    for (const m of ['survival', 'strike']) {
+      $(`mode-${m}`).addEventListener('click', () => { game.setup.mode = m; ui.saveSetup(); });
+    }
+    for (const m of ['arena', 'battlefield']) {
+      $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
+    }
+    for (const eq of EQUIP_DEFS) {
+      $(`eq-${eq}`).addEventListener('click', () => {
+        const list = game.setup.equip;
+        const i = list.indexOf(eq);
+        if (i >= 0) list.splice(i, 1);
+        else {
+          list.push(eq);
+          while (list.length > 2) list.shift();
+        }
+        ui.saveSetup();
+      });
+    }
+    $('lobby-map-btn').addEventListener('click', () => {
+      // host cycles the co-op map
+      game.setup.map = game.setup.map === 'arena' ? 'battlefield' : 'arena';
+      ui.saveSetup();
+      $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
     });
 
     return ui;
@@ -339,6 +409,10 @@ class Game {
       this.applyVolume();
       this.saveSettings();
     });
+  }
+
+  hasEquip(id) {
+    return this.setup.equip.includes(id);
   }
 
   saveSettings() {
@@ -436,18 +510,35 @@ class Game {
   startRun() {
     this.cheats.suspend(false);
     this.cheatsUsedThisRun = this.cheats.anyActive();
-    this.enemies = this.enemiesSolo;
+    this.mode = this.setup.mode;
+    this.world.load(this.setup.map);
+    this.warfare.reset();
+    document.querySelector('#gameover-screen h1').textContent = t('over.title');
+    this.enemies = this.mode === 'strike' ? this.soldiers : this.enemiesSolo;
+    if (this.mode === 'strike') this.enemiesSolo.reset();
+    else this.soldiers.reset();
     this._resetRunState();
+    this.warfare.spawnVehicles();
     this.enemies.startGame();
   }
 
+  strikeFinished(win, kills) {
+    document.querySelector('#gameover-screen h1').textContent =
+      t(win ? 'strike.win' : 'strike.lose');
+    this._finishRun();
+  }
+
   // multiplayer match entry (called by Multiplayer on 'started')
-  startMatch(mp) {
+  startMatch(mp, map = 'arena') {
     if (this.cheats.anyActive()) {
       this.hud.killfeed(t('mp.cheatsDisabled'), 'cheat');
     }
     this.cheats.suspend(true);
     this.cheatsUsedThisRun = false;
+    this.mode = 'survival';
+    this.world.load(map);
+    this.warfare.reset();
+    this.soldiers.reset();
     if (mp.isHost) {
       this.enemies = this.enemiesSolo;
     } else {
@@ -455,6 +546,7 @@ class Game {
       this.enemies = mp.replicas;
     }
     this._resetRunState();
+    this.warfare.spawnVehicles();
     if (mp.isHost) this.enemies.startGame();
     this.requestLock(); // clients may lack a gesture; click-to-lock recovers
   }
@@ -543,6 +635,16 @@ class Game {
       this.mp.onLocalDeath();
       return;
     }
+    if (this.mode === 'strike' && !this.enemies.done) {
+      // strike mode: redeploy instead of ending the run
+      this.enemies.onPlayerDeath();
+      return;
+    }
+    this._finishRun();
+  }
+
+  _finishRun() {
+    if (this.state !== 'playing') return;
     this.state = 'gameover';
     this.audio.gameOver();
     this.weapons.rig.visible = false;
@@ -591,7 +693,18 @@ class Game {
     if (reward) {
       this.addScore(reward.bonus);
       if (reward.refill) this.weapons.addReserveAll(2);
-      this.hud.banner(`${t(`streak.${this.streak}`)}  +${reward.bonus}`, 'streak');
+      if (reward.resupply) {
+        this.weapons.addReserveAll(1);
+        this.weapons.addGrenade(1);
+        if (this.hasEquip('plates')) {
+          this.player.armor = Math.min(75, this.player.armor + 50);
+          this.hud.setArmor(this.player.armor);
+        }
+      }
+      if (reward.railgun) this.weapons.grantRailgun();
+      if (reward.heli && !this.mp.active) this.warfare.callHelicopter();
+      const label = reward.key ? t(reward.key) : t(`streak.${this.streak}`);
+      this.hud.banner(`${label}  +${reward.bonus}`, 'streak');
       this.hud.bannerFadeSoon();
       this.audio.streak();
     }
@@ -639,7 +752,7 @@ class Game {
     if (pd < radius) {
       let falloff = Math.max(0.3, 1 - pd / radius);
       if (this._splashBlocked(origin, eye)) falloff *= 0.25;
-      this.player.takeDamage(dmg * falloff * 0.5, pos);
+      this.player.takeDamage(dmg * falloff * 0.5, pos, 'splash');
     }
     if (pd < radius * 3) {
       this.player.addShake(Math.min(0.12, 0.35 / Math.max(1, pd)));
@@ -658,6 +771,7 @@ class Game {
       this.enemies.update(gdt);
       this.pickups.update(gdt);
       this.effects.update(gdt);
+      this.warfare.update(gdt);
       this.mp.update(dt);
       this.hud.updateRadar(this.player, this.enemies.list, this.pickups.list,
         this.mp.active ? this.mp.remoteList() : []);

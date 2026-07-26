@@ -8,6 +8,7 @@ effect is synthesized with WebAudio at runtime. UI is available in English
 and Traditional Chinese (Taiwan) — 支援繁體中文（台灣）介面.
 
 ![Gameplay](docs/screenshot.png)
+![Battlefield](docs/battlefield.png)
 
 ## Run the full game (server + multiplayer)
 
@@ -48,6 +49,35 @@ python3 -m http.server 8080
 | `Esc` | Pause (sensitivity & volume settings) |
 | `~` / `F1` | Dev console (cheats) |
 
+## Modes, maps & loadout
+
+Clicking **SOLO** opens mission setup:
+
+- **Modes** — **Survival** (endless robot waves, also the co-op mode) and
+  **Squad Strike**: 30 eliminations in 5 minutes against respawning AI
+  soldiers who fight with the real weapon arsenal — burst discipline,
+  tightening aim, cover use and reloads. The full AI algorithm is
+  documented in [docs/AI.md](docs/AI.md).
+- **Maps** — the compact **Neon Arena** and the large dusk **Sector K
+  Battlefield** (bunkers, sandbag lines, watchtowers, a central hill, and
+  parked hoverbikes). The co-op host picks the map in the lobby.
+- **Equipment (pick 2)** — **Armor Plates** (blue armor pool absorbs
+  damage, refilled by ammo cells and resupply drops), **Combat Helmet**
+  (-40% explosive / -25% gunfire damage), **Stim Injector** (faster
+  regen), **Raider Boots** (+8% speed, higher jump).
+- **Vehicles** — walk up to a hoverbike and press `E` to ride: W/S
+  throttle, A/D steer, ram enemies at speed for kills.
+
+## Killstreak rewards
+
+| Streak | Reward |
+| --- | --- |
+| 5 | Resupply drop (ammo, grenade, armor plates) |
+| 7 | **AEGIS Railgun** — 5 piercing one-shot slugs on slot `0` |
+| 10 | Full ammo refill |
+| 12 | **Attack helicopter** escorts you for 30 s |
+| 15 / 20 | Big score bonuses |
+
 ## Core features
 
 - **Aim down sights** — per-weapon zoom and accuracy, reduced mobility, a
@@ -78,6 +108,8 @@ python3 -m http.server 8080
 | 6 | **Bastion LMG** | 75-round belt, slow reload, heavy |
 | 7 | **Spectre** | Bolt sniper, scope zoom, one-shot potential |
 | 8 | **Havoc RL** | Rocket launcher with splash damage |
+| 9 | **Volt Carbine** | 3-round burst rifle (rank 7) |
+| 0 | **Aegis Railgun** | Killstreak-only piercing cannon |
 
 Headshots deal double damage (2.5× on the Spectre).
 

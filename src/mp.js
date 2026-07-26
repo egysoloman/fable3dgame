@@ -400,7 +400,7 @@ export class Multiplayer {
   joinRoom(code) { this.send({ t: 'join', code }); }
   leaveRoom() { this.send({ t: 'leave' }); }
   setReady(v) { this.send({ t: 'ready', v }); }
-  requestStart() { this.send({ t: 'start' }); }
+  requestStart(map) { this.send({ t: 'start', map }); }
 
   inRoom() { return !!this.room; }
 
@@ -435,7 +435,7 @@ export class Multiplayer {
         game.ui.showMpBrowser();
         break;
       case 'started':
-        this._startMatch(msg.hostId === this.myId);
+        this._startMatch(msg.hostId === this.myId, msg.map || 'arena');
         break;
       case 'hostLeft':
         if (this.active) this._endMatch('hostLeft');
@@ -542,8 +542,9 @@ export class Multiplayer {
   }
 
   // ---- match lifecycle ----
-  _startMatch(isHost) {
+  _startMatch(isHost, map = 'arena') {
     this.active = true;
+    this.map = map;
     this.isHost = isHost;
     this.overSent = false;
     this.scores.clear();
@@ -551,7 +552,7 @@ export class Multiplayer {
       this.scores.set(p.id, { name: p.name, score: 0, kills: 0 });
     }
     this.replicas = isHost ? null : new ReplicaManager(this.game, this);
-    this.game.startMatch(this);
+    this.game.startMatch(this, map);
     this._syncMatchPlayers();
   }
 
@@ -578,7 +579,8 @@ export class Multiplayer {
     const p = game.player;
     p.alive = true;
     p.hp = Math.round(p.maxHp * 0.6);
-    p.position.set((Math.random() - 0.5) * 4, 0, 10);
+    const sp = game.world.map.playerSpawn;
+    p.position.set(sp[0] + (Math.random() - 0.5) * 4, 0, sp[1]);
     p.velocity.set(0, 0, 0);
     p.timeSinceDamage = 999;
     game.hud.setHealth(p.hp, p.maxHp);

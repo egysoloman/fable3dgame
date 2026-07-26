@@ -475,7 +475,7 @@ class Projectile {
         pos.y > p.position.y - 0.1 && pos.y < p.position.y + 1.9 &&
         pos.z > p.position.z - 0.5 && pos.z < p.position.z + 0.5
       ) {
-        p.takeDamage(this.dmg, pos);
+        p.takeDamage(this.dmg, pos, 'bolt');
         return false;
       }
 
