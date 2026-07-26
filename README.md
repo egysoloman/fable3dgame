@@ -212,12 +212,16 @@ cone, reaction delay, burst cadence, grenade usage, and speed (and wave
 HP/speed in Survival; see [docs/AI.md](docs/AI.md)). **Versus** is now
 also playable solo: three bot players with real weapons, armor, regen,
 respawns, and scoreboard entries fill the FFA — first to 15 kills.
+**Domination** is a true team fight: a 3-bot enemy squad pushes,
+captures, and defends zones while an allied bot (COBALT) fights beside
+you and captures for your side. The fourth map, **CVN Tempest Carrier**,
+is a naval deck with a multi-tier climbable island, parked jets for
+cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: bot teams in Domination and online Versus fill, aircraft
-carrier map, weapon attachments, drivable helicopters/tanks, larger
-rooms (8+), and quick-play matchmaking.
+Next up: bot fill in online rooms, weapon attachments, drivable
+helicopters/tanks, larger rooms (8+), and quick-play matchmaking.
 
 ## Tech notes
 

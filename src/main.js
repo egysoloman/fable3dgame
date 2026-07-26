@@ -246,7 +246,7 @@ class Game {
         for (const m of ['survival', 'strike', 'domination', 'versus']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
-        for (const m of ['arena', 'battlefield', 'station']) {
+        for (const m of ['arena', 'battlefield', 'station', 'carrier']) {
           $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
         }
         for (const eq of EQUIP_DEFS) {
@@ -410,7 +410,7 @@ class Game {
       ui.saveSetup();
       $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
     });
-    for (const m of ['arena', 'battlefield', 'station']) {
+    for (const m of ['arena', 'battlefield', 'station', 'carrier']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
     }
     for (const eq of EQUIP_DEFS) {
@@ -427,7 +427,7 @@ class Game {
     }
     $('lobby-map-btn').addEventListener('click', () => {
       // host cycles the co-op map
-      const cycle = ['arena', 'battlefield', 'station'];
+      const cycle = ['arena', 'battlefield', 'station', 'carrier'];
       game.setup.map = cycle[(cycle.indexOf(game.setup.map) + 1) % cycle.length];
       ui.saveSetup();
       $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
@@ -754,9 +754,10 @@ class Game {
       this.enemies.onPlayerDeath();
       return;
     }
-    if (this.mode === 'versus' && !this.mp.active && !this.enemies.done) {
-      // offline FFA: credit the killer bot, then redeploy
-      if (this.player.lastBotAttacker) {
+    if ((this.mode === 'versus' || this.mode === 'domination') &&
+        !this.mp.active && !this.enemies.done) {
+      // bot-team modes: credit the killer bot, then redeploy
+      if (this.player.lastBotAttacker && this.enemies.creditPlayerDeath) {
         this.enemies.creditPlayerDeath(this.player.lastBotAttacker);
         this.player.lastBotAttacker = null;
       }
@@ -914,7 +915,8 @@ class Game {
       this.warfare.update(gdt);
       this.mp.update(dt);
       this.hud.updateRadar(this.player, this.enemies.list, this.pickups.list,
-        this.mp.active ? this.mp.remoteList() : []);
+        this.mp.active ? this.mp.remoteList()
+          : this.enemies.teammates ? this.enemies.teammates() : []);
       this.hud.updateCompass(this.player.yaw);
     } else if (this.state === 'menu' || this.state === 'gameover') {
       // slow orbiting camera behind the menu

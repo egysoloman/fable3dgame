@@ -44,13 +44,15 @@ function makeTag(name) {
   return sprite;
 }
 
-class BotPlayer {
-  constructor(game, match, id, name, color, diff) {
+export class BotPlayer {
+  constructor(game, match, id, name, color, diff, team = null) {
     this.game = game;
     this.match = match;
     this.id = id;
     this.name = name;
     this.diff = diff;
+    this.team = team;          // null = FFA; 'allies' | 'enemies' in team modes
+    this.objective = null;     // Vector3 the bot pushes toward when not fighting
     this.type = { attack: 'ranged', scale: 1, name: 'bot' };  // radar interface
     this.maxHp = Math.round(100 * diff.hpMul);
     this.hp = this.maxHp;
@@ -101,7 +103,9 @@ class BotPlayer {
 
   respawn() {
     const pts = this.game.world.spawnPoints;
-    const pos = pts[Math.floor(Math.random() * pts.length)].clone();
+    const pos = this.match.spawnFor
+      ? this.match.spawnFor(this)
+      : pts[Math.floor(Math.random() * pts.length)].clone();
     pos.x += (Math.random() - 0.5) * 3;
     pos.z += (Math.random() - 0.5) * 3;
     this.position.copy(pos);
@@ -118,14 +122,19 @@ class BotPlayer {
     this.game.effects.spawnPortal(pos, 0xffb4a0);
   }
 
-  // nearest visible combatant: the human player or any other bot
+  // nearest visible combatant: FFA sees everyone; team modes ask the match
   _pickTarget() {
-    const cands = [];
-    const p = this.game.player;
-    if (p.alive) cands.push({ isPlayer: true, position: p.position, eyeY: 1.6 });
-    for (const b of this.match.bots) {
-      if (b !== this && b.alive && b.spawnTimer <= 0) {
-        cands.push({ isPlayer: false, bot: b, position: b.position, eyeY: 1.55 });
+    let cands;
+    if (this.match.targetsFor) {
+      cands = this.match.targetsFor(this);
+    } else {
+      cands = [];
+      const p = this.game.player;
+      if (p.alive) cands.push({ isPlayer: true, position: p.position, eyeY: 1.6 });
+      for (const b of this.match.bots) {
+        if (b !== this && b.alive && b.spawnTimer <= 0) {
+          cands.push({ isPlayer: false, bot: b, position: b.position, eyeY: 1.55 });
+        }
       }
     }
     let best = null, bd = Infinity;
@@ -178,7 +187,7 @@ class BotPlayer {
       const hitT = this._rayVsAabb(from, dir, b.position, b.halfW, b.height);
       if (hitT !== null && hitT < wallDist) {
         end = from.clone().addScaledVector(dir, hitT);
-        b.takeDamage(this.weapon.damage, end, false, this.id);
+        b.takeDamage(this.weapon.damage * 0.6, end, false, this.id); // bot-vs-bot pacing
       }
     }
     if (!end) {
@@ -276,14 +285,29 @@ class BotPlayer {
     }
     const move = new THREE.Vector3();
     let dist = 999;
+    if (!this.target && this.objective) {
+      const toO = new THREE.Vector3(
+        this.objective.x - this.position.x, 0, this.objective.z - this.position.z);
+      if (toO.length() > 2.2) {
+        move.copy(toO.normalize());
+        g.rotation.y = Math.atan2(move.x, move.z);
+      }
+    }
     if (this.target) {
       const toT = new THREE.Vector3(
         this.target.position.x - this.position.x, 0, this.target.position.z - this.position.z);
       dist = toT.length();
       if (dist > 0.001) toT.divideScalar(dist);
       const pref = RANGE_PREF[this.weapon.id];
-      if (this.reloadTimer > 0 || !this.hasLOS) {
-        move.copy(toT).multiplyScalar(this.reloadTimer > 0 ? -1 : 1);
+      if (this.reloadTimer > 0) {
+        move.copy(toT).negate();
+      } else if (!this.hasLOS && this.objective) {
+        // push the objective instead of chasing ghosts
+        const toO = new THREE.Vector3(
+          this.objective.x - this.position.x, 0, this.objective.z - this.position.z);
+        if (toO.length() > 2.2) move.copy(toO.normalize());
+      } else if (!this.hasLOS) {
+        move.copy(toT);
       } else {
         if (dist > pref * 1.4) move.copy(toT);
         else if (dist < pref * 0.6) move.copy(toT).negate();

@@ -211,6 +211,63 @@ export const MAPS = {
       w.spawnPoints = w.ringSpawns(10, this.size / 2 - 5);
     },
   },
+
+  carrier: {
+    id: 'carrier',
+    size: 120,
+    fog: [0x0a1420, 40, 190],
+    bg: 0x0a1420,
+    hemi: [0x7a9ab8, 0x0a1018, 1.0],
+    sun: [0xd8e8ff, 1.35],
+    floorColors: ['#1c2228', '#2e3a44', '#8a97a8'],
+    accents: [
+      [-45, 0x62f0ff, -45], [45, 0xffcf3b, -45], [-45, 0xffcf3b, 45], [45, 0x62f0ff, 45],
+    ],
+    playerSpawn: [0, 46],
+    domPoints: [[0, -34], [-28, 10], [30, 18]],
+    vehicles: [[-8, 38, 0.4], [8, 38, -0.4]],
+    build(w) {
+      const S = this.size;
+      // "ocean" tint outside the deck happens via the dark outer plane; add
+      // deck edge rails (low, non-climb-over aesthetic barriers)
+      // island superstructure: stacked, climbable tiers on the starboard side
+      w.addBox(34, 2.5, -8, 10, 5, 8, w.mats.bunker);
+      w.addBox(34, 6.2, -8, 7, 2.4, 6, w.mats.bunker);
+      w.addBox(36, 8.6, -8, 4, 2.4, 4, w.mats.pillar);
+      w.addTrim(34, 5.1, -8, 10.2, 0.2, 8.2);
+      w.addTrim(36, 9.9, -8, 4.2, 0.2, 4.2);
+      // stairs of crates up the island
+      w.addBox(27.5, 0.7, -8, 3, 1.4, 3, w.mats.container);
+      w.addBox(30.5, 1.9, -8, 3, 3.8, 3, w.mats.container);
+
+      // parked jets: fuselage + wing blocks, good hard cover
+      const jets = [[-20, -30, 0], [-2, -36, 1], [16, -28, 0]];
+      for (const [jx, jz] of jets) {
+        w.addBox(jx, 1.1, jz, 2.2, 2.2, 9, w.mats.container);
+        w.addBox(jx, 0.8, jz + 1, 8, 0.5, 3, w.mats.bunker);
+      }
+
+      // hangar bay: roofed section with support pillars (CQB)
+      w.addBox(-30, 3.4, 14, 24, 0.6, 22, w.mats.bunker);   // roof slab
+      for (const [px, pz] of [[-40, 5], [-20, 5], [-40, 23], [-20, 23]]) {
+        w.addBox(px, 1.55, pz, 1.2, 3.1, 1.2, w.mats.pillar);
+      }
+      w.addBox(-30, 1.5, 25, 24, 3, 1, w.mats.bunker);      // hangar back wall
+      for (let i = 0; i < 4; i++) {
+        w.addBox(-38 + i * 6, 1, 12, 2.4, 2, 2.4, w.mats.container);
+      }
+      w.addTrim(-30, 3.8, 14, 24.2, 0.15, 22.2);
+
+      // catapult ramps & deck clutter
+      w.addBox(8, 0.55, 8, 12, 1.1, 1.6, w.mats.sandbag);
+      w.addBox(-6, 0.55, -12, 1.6, 1.1, 12, w.mats.sandbag);
+      w.addBox(20, 0.9, 34, 3, 1.8, 3, w.mats.container);
+      w.addBox(-16, 0.9, 36, 3, 1.8, 3, w.mats.container);
+      w.addBox(44, 0.9, 30, 3, 1.8, 3, w.mats.container);
+
+      w.spawnPoints = w.ringSpawns(12, S / 2 - 6);
+    },
+  },
 };
 
 export class World {
