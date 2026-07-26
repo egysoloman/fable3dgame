@@ -884,6 +884,7 @@ export class WeaponSystem {
       ];
       if (this.game.mp && this.game.mp.versus) {
         targets.push(...this.game.mp.pvpTargets());
+        if (this.game.mp.fillBots) targets.push(...this.game.mp.fillBotGroups());
       }
       const spread = this.currentSpread();
       let lastEnd = null;

@@ -145,7 +145,32 @@ export class BotPlayer {
     this.game.effects.spawnPortal(pos, 0xffb4a0);
   }
 
-  // nearest visible combatant: FFA sees everyone; team modes ask the match
+  // MP fill-bot replica on clients: interpolate host snapshots, no AI
+  _puppetUpdate(dt) {
+    const g = this.group;
+    if (!this.alive) {
+      this.dying += dt;
+      const tt = Math.min(1, this.dying / 0.6);
+      g.scale.set(1 + tt * 0.4, Math.max(0.01, 1 - tt), 1 + tt * 0.4);
+      this.parts.bodyMat.opacity = 1 - tt;
+      if (this.dying > 0.65) g.visible = false;
+      return true;
+    }
+    if (this.spawnTimer > 0) this.spawnTimer -= dt;
+    if (this.targetPos) {
+      const k = 1 - Math.exp(-10 * dt);
+      this.position.lerp(this.targetPos, k);
+      let dy = (this.puppetYaw || 0) - g.rotation.y;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      g.rotation.y += dy * k;
+    }
+    g.position.copy(this.position);
+    this._visuals(dt, true, 4);
+    return true;
+  }
+
+  // nearest visible combatant; FFA sees everyone; team modes ask the match
   _pickTarget() {
     let cands;
     if (this.match.targetsFor) {
@@ -342,6 +367,13 @@ export class BotPlayer {
         this.game.player.lastBotAttacker = this.id;
         this.game.player.takeDamage(this.weapon.damage * 0.5, this.position, 'bullet');
       }
+    } else if (tgt.remote) {
+      // MP fill bot vs a remote player: the host relays the hit
+      const hitT = this._rayVsAabb(from, dir, tgt.position, 0.4, 1.8);
+      if (hitT !== null && hitT < wallDist) {
+        end = from.clone().addScaledVector(dir, hitT);
+        this.game.mp.sendBotHurt(tgt.remote.id, this.weapon.damage * 0.5);
+      }
     } else {
       const b = tgt.bot;
       const hitT = this._rayVsAabb(from, dir, b.position, b.halfW, b.height);
@@ -397,6 +429,7 @@ export class BotPlayer {
 
   update(dt) {
     const g = this.group;
+    if (this.puppet) return this._puppetUpdate(dt);
     if (!this.alive) {
       this.dying += dt;
       const tt = Math.min(1, this.dying / 0.6);
@@ -676,6 +709,14 @@ export class BotPlayer {
   // player-rule damage: armor absorbs before health; flinch widens aim
   takeDamage(dmg, point, headshot, attackerId) {
     if (!this.alive) return;
+    if (this.puppet) {
+      // client replica: forward the claim to the host, keep local feedback
+      this.game.mp.sendBotDmg(this.id, dmg, !!headshot);
+      if (point) this.game.effects.enemyHitSparks(point);
+      if (attackerId === undefined) this.game.audio.hit(headshot);
+      this.flashTime = 0.08;
+      return;
+    }
     if (this.game.cheats && this.game.cheats.is('instantKill') &&
         attackerId === undefined) dmg = this.hp + this.armor;
     this.timeSinceDamage = 0;

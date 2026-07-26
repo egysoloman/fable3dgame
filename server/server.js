@@ -121,6 +121,15 @@ function roomListPayload() {
       code: room.code,
       count: room.players.size,
       max: MAX_PLAYERS,
+      avgRank: (() => {
+        let sum = 0, n = 0;
+        for (const pid of room.players.keys()) {
+          const pc = clients.get(pid);
+          sum += (pc && pc.rank) || 1;
+          n++;
+        }
+        return n ? Math.round(sum / n) : 1;
+      })(),
       started: room.started,
       host: room.players.get(room.hostId)?.name || '?',
     });
@@ -172,6 +181,7 @@ wss.on('connection', (ws) => {
     switch (msg.t) {
       case 'hello': {
         c.name = String(msg.name || 'PLAYER').slice(0, 16).trim() || 'PLAYER';
+        c.rank = Math.max(1, Math.min(10, parseInt(msg.rank, 10) || 1));
         break;
       }
       case 'list': {
@@ -206,12 +216,26 @@ wss.on('connection', (ws) => {
         break;
       }
       case 'quick': {
-        // quick play: drop into the fullest open lobby, or open a new one
+        // skill-based quick play: prefer the open lobby whose average rank
+        // is closest to the requester's, then the fullest
         if (room) leaveRoom(id, false);
-        let target = null;
+        const myRank = c.rank || 1;
+        let target = null, bestKey = null;
         for (const r of rooms.values()) {
           if (r.started || r.players.size >= MAX_PLAYERS) continue;
-          if (!target || r.players.size > target.players.size) target = r;
+          let sum = 0, n = 0;
+          for (const pid of r.players.keys()) {
+            const pc = clients.get(pid);
+            sum += (pc && pc.rank) || 1;
+            n++;
+          }
+          const avg = n ? sum / n : myRank;
+          const key = [Math.abs(avg - myRank), -r.players.size];
+          if (!target || key[0] < bestKey[0] ||
+              (key[0] === bestKey[0] && key[1] < bestKey[1])) {
+            target = r;
+            bestKey = key;
+          }
         }
         if (target) {
           target.players.set(id, { name: c.name, ready: false });
@@ -256,9 +280,10 @@ wss.on('connection', (ws) => {
         room.mode = msg.mode === 'versus' ? 'versus' : 'survival';
         room.difficulty = ['easy', 'normal', 'hard', 'expert'].includes(msg.difficulty)
           ? msg.difficulty : 'normal';
+        room.bots = Math.max(0, Math.min(3, parseInt(msg.bots, 10) || 0));
         broadcastRoom(room, {
           t: 'started', hostId: room.hostId, map: room.map, mode: room.mode,
-          difficulty: room.difficulty });
+          difficulty: room.difficulty, bots: room.bots });
         broadcastRoom(room, roomStatePayload(room));
         break;
       }

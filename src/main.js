@@ -445,6 +445,7 @@ class Game {
           const host = document.createElement('span');
           host.className = 'grow';
           host.textContent = `${r.host} · ${r.count}/${r.max}` +
+            (r.avgRank ? ` · ~R${r.avgRank}` : '') +
             (r.started ? ` · ${t('mp.inMatch')}` : '');
           const join = document.createElement('button');
           join.className = 'join-btn';
@@ -490,6 +491,7 @@ class Game {
         $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
         $('lobby-mode-btn').textContent = t(`mode.${game.mpMode || 'survival'}`);
         $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
+        $('lobby-bots-btn').textContent = String(game.mpBotFill || 0);
         $('ready-btn').style.display = amHost ? 'none' : '';
         $('ready-btn').textContent = meReady ? t('mp.unready') : t('mp.ready');
         $('start-match-btn').style.display = amHost ? '' : 'none';
@@ -583,7 +585,8 @@ class Game {
     $('start-match-btn').addEventListener('click', () => {
       game.audio.init();
       game.applyVolume();
-      game.mp.requestStart(game.setup.map, game.mpMode || 'survival', game.setup.difficulty);
+      game.mp.requestStart(game.setup.map, game.mpMode || 'survival',
+        game.setup.difficulty, game.mpBotFill || 0);
     });
     $('leave-lobby-btn').addEventListener('click', () => {
       game.mp.leaveRoom();
@@ -642,6 +645,11 @@ class Game {
     $('lobby-mode-btn').addEventListener('click', () => {
       game.mpMode = game.mpMode === 'versus' ? 'survival' : 'versus';
       $('lobby-mode-btn').textContent = t(`mode.${game.mpMode}`);
+    });
+    $('lobby-bots-btn').addEventListener('click', () => {
+      // versus bot fill, host-controlled: 0-3 host-simulated bots
+      game.mpBotFill = ((game.mpBotFill || 0) + 1) % 4;
+      $('lobby-bots-btn').textContent = String(game.mpBotFill);
     });
 
     return ui;

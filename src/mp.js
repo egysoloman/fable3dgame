@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ENEMY_TYPES, buildEnemyBody } from './enemies.js';
+import { BotPlayer, DIFFICULTY } from './bots.js';
 import { t } from './i18n.js';
 
 // Co-op wave survival: the server manages rooms and relays; the room HOST's
@@ -441,7 +442,8 @@ export class Multiplayer {
       ws.onopen = () => {
         this.connected = true;
         this.game.ui.setServerStatus('connected');
-        this.send({ t: 'hello', name: this.name });
+        this.send({ t: 'hello', name: this.name,
+          rank: this.game.progression ? this.game.progression.rank : 1 });
       };
       ws.onmessage = (ev) => {
         let msg;
@@ -474,7 +476,8 @@ export class Multiplayer {
   setName(name) {
     this.name = (name || 'PLAYER').slice(0, 16).trim() || 'PLAYER';
     try { localStorage.setItem('neonstrike.name', this.name); } catch (e) { /* ok */ }
-    this.send({ t: 'hello', name: this.name });
+    this.send({ t: 'hello', name: this.name,
+      rank: this.game.progression ? this.game.progression.rank : 1 });
   }
 
   // ---- lobby actions (wired to UI in main.js) ----
@@ -484,7 +487,9 @@ export class Multiplayer {
   joinRoom(code) { this.send({ t: 'join', code }); }
   leaveRoom() { this.send({ t: 'leave' }); }
   setReady(v) { this.send({ t: 'ready', v }); }
-  requestStart(map, mode, difficulty) { this.send({ t: 'start', map, mode, difficulty }); }
+  requestStart(map, mode, difficulty, bots = 0) {
+    this.send({ t: 'start', map, mode, difficulty, bots });
+  }
 
   inRoom() { return !!this.room; }
 
@@ -520,6 +525,7 @@ export class Multiplayer {
         break;
       case 'started':
         this.game.matchDifficulty = msg.difficulty || 'normal';
+        this._fillCount = msg.bots || 0;
         this._startMatch(msg.hostId === this.myId, msg.map || 'arena', msg.mode || 'survival');
         break;
       case 'hostLeft':
@@ -643,6 +649,52 @@ export class Multiplayer {
         if (!this.isHost) this._endMatch('over');
         break;
       }
+      case 'bots': {
+        if (this.isHost) break;
+        if (!this.fillBots) this.fillBots = [];
+        for (const [bid, x, y, z, yaw, hp, alive] of d.arr) {
+          let b = this.fillBots.find((q) => q.id === bid);
+          if (!b) {
+            const diff = DIFFICULTY[game.matchDifficulty] || DIFFICULTY.normal;
+            b = new BotPlayer(game, { targetsFor: () => [] }, bid,
+              this._botName(bid), 0xd88a3b, diff, null);
+            b.puppet = true;
+            b.targetPos = new THREE.Vector3(x, y, z);
+            b.position.set(x, y, z);
+            this.fillBots.push(b);
+          }
+          b.targetPos.set(x, y, z);
+          b.puppetYaw = yaw;
+          b.hp = hp;
+          if (b.alive && !alive) {
+            b.alive = false;
+            b.dying = 0;
+          } else if (!b.alive && alive) {
+            b.alive = true;
+            b.dying = 0;
+            b.spawnTimer = 0.01;
+            b.group.visible = true;
+            b.group.scale.setScalar(1);
+            b.parts.bodyMat.opacity = 1;
+          }
+        }
+        break;
+      }
+      case 'botDmg': {
+        if (!this.isHost || !this.fillBots) break;
+        const b = this.fillBots.find((q) => q.id === d.bid);
+        if (b) b.takeDamage(d.dmg, null, !!d.hs, from);
+        break;
+      }
+      case 'botKill': {
+        this._creditBotKill(d.by, d.bid);
+        break;
+      }
+      case 'bHurt': {
+        this.lastAttacker = null; // bot deaths credit nobody
+        game.player.takeDamage(d.dmg, null, 'bullet');
+        break;
+      }
     }
   }
 
@@ -672,6 +724,82 @@ export class Multiplayer {
     this.replicas = (isHost || mode === 'versus') ? null : new ReplicaManager(this.game, this);
     this.game.startMatch(this, map, mode);
     this._syncMatchPlayers();
+    this._clearFillBots();
+    if (isHost && mode === 'versus' && this._fillCount > 0) {
+      this._spawnFillBots(this._fillCount);
+    }
+  }
+
+  // ---- bot fill (versus): host simulates, clients render puppets ----
+  _spawnFillBots(n) {
+    const diff = DIFFICULTY[this.game.matchDifficulty] || DIFFICULTY.normal;
+    const shim = {
+      bots: [],
+      targetsFor: (bot) => {
+        const out = [];
+        const p = this.game.player;
+        if (p.alive) out.push({ isPlayer: true, position: p.position, eyeY: 1.6 });
+        for (const r of this.remoteList()) {
+          if (r.alive) {
+            out.push({ isPlayer: false, bot: null, remote: r,
+              position: r.position, eyeY: 1.5 });
+          }
+        }
+        for (const b of this.fillBots) {
+          if (b !== bot && b.alive && b.spawnTimer <= 0) {
+            out.push({ isPlayer: false, bot: b, position: b.position, eyeY: 1.55 });
+          }
+        }
+        return out;
+      },
+      onKill: (killerId, victimId) => {
+        const by = killerId === 'me' ? this.myId : killerId;
+        this.relay({ k: 'botKill', by, bid: victimId });
+        this._creditBotKill(by, victimId);
+      },
+    };
+    this.fillBots = [];
+    shim.bots = this.fillBots;
+    for (let i = 0; i < Math.min(3, n); i++) {
+      this.fillBots.push(new BotPlayer(
+        this.game, shim, `mpb-${i}`, this._botName(`mpb-${i}`), 0xd88a3b, diff, null));
+    }
+  }
+
+  _clearFillBots() {
+    for (const b of this.fillBots || []) b.dispose();
+    this.fillBots = [];
+  }
+
+  _botName(bid) {
+    const names = ['ROOK', 'HALO', 'ONYX'];
+    return names[parseInt(String(bid).split('-')[1], 10)] || 'BOT';
+  }
+
+  fillBotGroups() {
+    return (this.fillBots || [])
+      .filter((b) => b.alive && b.spawnTimer <= 0).map((b) => b.group);
+  }
+
+  sendBotDmg(bid, dmg, hs) {
+    if (this.room) {
+      this.relayTo(this.room.hostId, { k: 'botDmg', bid, dmg: Math.round(dmg), hs: hs ? 1 : 0 });
+    }
+  }
+
+  sendBotHurt(playerId, dmg) {
+    this.relayTo(playerId, { k: 'bHurt', dmg: Math.round(dmg) });
+  }
+
+  _creditBotKill(by, bid) {
+    const entry = this.scores.get(by);
+    if (entry) { entry.kills++; entry.score += 100; }
+    if (by === this.myId) {
+      this.game.addKillMp();
+      this.game.addScore(100);
+    }
+    this.game.hud.killfeed(t('mp.playerKilled', {
+      player: this._nameOf(by), enemy: this._botName(bid) }));
   }
 
   _syncMatchPlayers() {
@@ -830,6 +958,21 @@ export class Multiplayer {
       this.relay(ps);
     }
 
+    // bot fill: the host runs real AI, everyone else interpolates puppets
+    if (this.active && this.fillBots && this.fillBots.length) {
+      for (const b of this.fillBots) b.update(dt);
+      if (this.isHost) {
+        this.botAcc = (this.botAcc || 0) + dt;
+        if (this.botAcc >= 1 / SNAP_HZ) {
+          this.botAcc = 0;
+          this.relay({ k: 'bots', arr: this.fillBots.map((b) => [b.id,
+            +b.position.x.toFixed(1), +b.position.y.toFixed(1),
+            +b.position.z.toFixed(1), +b.group.rotation.y.toFixed(2),
+            Math.round(b.hp), b.alive ? 1 : 0]) });
+        }
+      }
+    }
+
     // versus: self-managed respawn + shared end conditions
     if (this.versus) {
       if (this.pvpRespawn > 0) {
@@ -893,6 +1036,7 @@ export class Multiplayer {
   }
 
   _endMatch(reason) {
+    this._clearFillBots();
     if (!this.active) return;
     this.active = false;
     this.isHost = false;

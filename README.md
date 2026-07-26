@@ -73,6 +73,9 @@ python3 -m http.server 8080
 | `Space` | Jump (crates are climbable) |
 | `1`–`8` or wheel | Switch weapon |
 | `R` | Reload |
+| `V` | Quick melee |
+| `F` | Plant the charge (Search & Destroy) |
+| `0` | Orbital railgun tactical view (once earned) |
 | `Esc` | Pause (sensitivity, volume & graphics quality settings) |
 | `~` / `F1` | Dev console (cheats) |
 
@@ -80,15 +83,19 @@ python3 -m http.server 8080
 
 Clicking **SOLO** opens mission setup:
 
-- **Modes** — **Survival** (endless robot waves, also the co-op mode),
-  **Squad Strike** (30 eliminations in 5 minutes against respawning AI
-  soldiers), **Domination** (bot teams contest three zones),
-  **Team Deathmatch** (your fireteam — you plus two ally bots — against
-  an enemy squad; every elimination scores, first to 30 or the higher
-  score at five minutes), and **Versus** (free-for-all, online PvP or
-  offline against bot players). The full AI algorithm is documented in
-  [docs/AI.md](docs/AI.md).
-- **Maps** — the compact **Neon Arena**, the large dusk **Sector K
+- **Modes (10)** — **Survival** (endless robot waves, also the co-op
+  mode), **Squad Strike** (30 eliminations vs respawning AI soldiers),
+  **Domination** (bot teams contest three zones), **Team Deathmatch**
+  (your fireteam vs an enemy squad, first to 30), **Versus**
+  (free-for-all, online PvP or offline vs bots), **Capture the Flag**
+  (steal their banner, 3 caps; dead carriers drop it), **Hardpoint**
+  (hold a zone that relocates every 40 s, first to 120), **Gun Game**
+  (every kill advances you through a 12-weapon ladder), **Search &
+  Destroy** (plant at A or B with `F`, one life per round while the
+  charge is down, first to 3 rounds), and **Infection** (survive
+  PATIENT-0 for 3 minutes — anyone killed turns, including you). The
+  full AI algorithm is documented in [docs/AI.md](docs/AI.md).
+- **Maps (10, with a screenshot picker)** — the compact **Neon Arena**, the large dusk **Sector K
   Battlefield** (bunkers, sandbag lines, watchtowers, a central hill),
   the low-gravity **Helios Station**, the naval **CVN Tempest Carrier**,
   the open **Amber Wastes** desert (dune plateaus, rock spires, ancient
@@ -107,8 +114,12 @@ Clicking **SOLO** opens mission setup:
   station, ocean, cumulus and sun around the carrier, hazy noon sky
   over the desert, a burning dusk over the battlefield, and a starry
   night above the rooftop — painted onto canvas at load, no texture
-  downloads. All maps support every mode; the co-op host picks the map
-  in the lobby.
+  downloads. The **Undercity Tunnels** — a fully enclosed corridor grid
+  under a ceiling, 10 m visibility, knife-fight CQB — and the **Ashfall
+  Ruins**, a post-war district of gutted, enterable building shells
+  with walkable upper floors, complete the set. All maps support every
+  mode, mission setup shows all ten as in-game screenshot cards, and
+  the co-op host picks the map in the lobby.
 - **Open edges** — not every map is walled. The carrier deck and the
   rooftop have real edges: step off and you fall to your death (the
   ocean, or the streets far below). The desert has no walls at all —
@@ -143,8 +154,11 @@ Clicking **SOLO** opens mission setup:
 
 | Streak | Reward |
 | --- | --- |
+| 3 | **UAV** — full radar for 20 s |
 | 5 | Resupply drop (ammo, grenade, armor plates) |
+| 6 | **Airstrike** — a stick of five bombs walks a line across your aim point |
 | 7 | **Orbital railgun** — press `0` for a top-down tactical view, steer the reticle with the mouse and click to call 3 railgun lances from orbit with heavy AOE splash. Full spectacle: charge-up hum with a converging glow ring, a slim light-strip beam from orbit, a thunderclap impact with screen shake, and a HUD charge indicator |
+| 8 | **Care package** — a crate drops ahead with a random reward |
 | 10 | Full ammo refill |
 | 12 | **Attack helicopter** escorts you for 30 s |
 | 15 / 20 | Big score bonuses |
@@ -178,18 +192,22 @@ deltas while hovering** an alternative, and magazine / reload / reserve
 numbers. Attachments and equipment live on the same screen, and three
 loadout presets (plus a one-click default) persist locally.
 
-**Primaries (14)** — assault rifles *Helix AR, Ravager-47, Volt Carbine
+**Primaries (16)** — assault rifles *Helix AR, Ravager-47, Volt Carbine
 (burst)*; SMGs *Viper, Hornet-90 (50-rd), Tempo*; shotguns *Breacher
 (pump), Mauler-12 (semi-auto)*; LMGs *Bastion, Warhound*; DMRs *Judge,
-Falcon-S*; sniper *Spectre* (scope, one-shot potential); and the
-*Havoc RL* rocket launcher.
+Falcon-S*; sniper *Spectre* (scope, one-shot potential); the *Havoc RL* rocket
+launcher, the *Longbow-50* heavy sniper (rank 9, one-shot potential),
+and the *Arc Rifle* energy hyperburst (rank 10).
 
-**Secondaries (3)** — *P-9 Sidearm* (infinite reserve), *Wasp-18*
-machine pistol (full-auto), *Ironclad .44* revolver (2.5× headshots).
+**Secondaries (4)** — *P-9 Sidearm* (infinite reserve), *Wasp-18*
+machine pistol (full-auto), *Ironclad .44* revolver (2.5× headshots),
+and the *Stalker-X* crossbow (single bolt, 2.5× headshots).
 
-**Throwables (4)** — *Frag* (cooked splash), *Sticky Bomb* (latches on,
+**Throwables (5)** — *Frag* (cooked splash), *Sticky Bomb* (latches on,
 bigger blast), *Flashbang* (whites out and stuns anyone with line of
-sight), *Smoke Grenade* (a smoke sphere that blocks AI vision).
+sight), *Smoke Grenade* (a smoke sphere that blocks AI vision), and the
+*Molotov* (shatters on contact into a 6-second burning zone). Quick
+melee is always on `V` — a knife jab that works with any weapon out.
 
 Slot `0` calls the **orbital railgun strike** once the 7-killstreak is
 earned. Headshots deal double damage (2.5× on the Spectre and Ironclad).
@@ -276,8 +294,11 @@ suppression fire over last-known positions, and coordinated
 advance/overwatch team roles. Flashbangs stun AI and smoke blocks every
 AI sight line. Bots also **use vehicles**: from normal difficulty up,
 a bot with a distant objective will commandeer a free hoverbike, ride
-it into the fight (watch for drive-by rams), and hop off close-in.
-The full algorithm is documented in [docs/AI.md](docs/AI.md). **Versus** is now
+it into the fight (watch for drive-by rams), and hop off close-in — and
+on hard and expert they **crew battle tanks**, holding hull-down at
+mid-range while the turret tracks you and the cannon fires with real
+line of sight. The full algorithm is documented in
+[docs/AI.md](docs/AI.md). **Versus** is now
 also playable solo: three bot players with real weapons, armor, regen,
 respawns, and scoreboard entries fill the FFA — first to 15 kills.
 **Domination** is a true team fight: a 3-bot enemy squad pushes,
@@ -288,12 +309,28 @@ cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: more weapons (heavy sniper, energy rifle, melee, molotov),
-bot fill in online rooms, an expanded killstreak ladder (UAV, airstrike,
-care package), more modes (CTF, Search & Destroy, Infection), and
-skill-based matchmaking with parties. The pause menu's **graphics
-quality** setting (LOW / MEDIUM / HIGH) trades resolution and shadows
-for frame rate on low-end devices.
+The roadmap is fully shipped: 10 modes, 10 maps with a screenshot map
+picker, a 20-weapon loadout armory with melee and five throwables,
+drivable and AI-crewed vehicles, the full killstreak ladder, bot fill
+in online versus rooms, and skill-based quick play. The pause menu's
+**graphics quality** setting (LOW / MEDIUM / HIGH) trades resolution
+and shadows for frame rate on low-end devices.
+
+## Online: bot fill, matchmaking & parties
+
+- **Bot fill** — the versus lobby has a host-controlled **BOTS**
+  counter (0–3). Fill bots are simulated by the host with the full
+  tactical AI, replicated to every client at 10 Hz, and can be shot by
+  anyone: client hits relay damage claims to the host, and kills count
+  on the shared scoreboard toward the 15-kill target.
+- **Skill-based quick play** — clients report their rank; QUICK PLAY
+  places you in the open lobby whose average rank is closest to yours
+  (fullest first on ties), and the room browser shows each lobby's
+  average rank (`~R4`).
+- **Parties** — a room code *is* your party: create one, share the
+  4-letter code, and the lobby persists across matches (scoreboard,
+  host map/mode/difficulty/bots controls), so your squad stays together
+  from game to game.
 
 ## Tech notes
 
