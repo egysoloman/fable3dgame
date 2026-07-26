@@ -322,6 +322,7 @@ class Enemy {
 
   takeDamage(dmg, point, headshot) {
     if (!this.alive) return;
+    if (this.game.cheats && this.game.cheats.flags.instantKill) dmg = this.hp;
     this.hp -= dmg;
     this.flashTime = 0.08;
     if (point) this.game.effects.enemyHitSparks(point);
@@ -476,10 +477,19 @@ export class EnemyManager {
     return q;
   }
 
+  forceNextWave() {
+    if (this.state === 'idle') return;
+    if (this.state === 'intermission') {
+      this.timer = 0.01;
+      return;
+    }
+    this._beginWave(); // stacks the next wave onto whatever is still alive
+  }
+
   _beginWave() {
     this.wave++;
     this.state = 'spawning';
-    this.spawnQueue = this._composition(this.wave);
+    this.spawnQueue = this.spawnQueue.concat(this._composition(this.wave));
     this.spawnTimer = 0;
     this.mods = {
       hpMul: 1 + (this.wave - 1) * 0.06,

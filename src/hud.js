@@ -36,7 +36,13 @@ export class HUD {
       finalKills: document.getElementById('final-kills'),
       finalStreak: document.getElementById('final-streak'),
       bestScore: document.getElementById('best-score'),
+      finalRank: document.getElementById('final-rank'),
+      finalCheatnote: document.getElementById('final-cheatnote'),
+      rankValue: document.getElementById('rank-value'),
+      menuRank: document.getElementById('menu-rank'),
+      arsenal: document.getElementById('arsenal'),
     };
+    this.game = null; // bound by Game after construction
     this.radarCtx = document.getElementById('radar').getContext('2d');
     this.compassCtx = document.getElementById('compass').getContext('2d');
     this._hitTimeout = null;
@@ -75,9 +81,33 @@ export class HUD {
     if (reloading) this.el.reloadHint.classList.remove('visible');
   }
 
-  setGrenades(n) {
-    this.el.grenadeRow.textContent = n > 0 ? '⬢'.repeat(n) : '';
-    this.el.grenadeRow.title = `${n} grenades [G]`;
+  setGrenades(n, infinite = false) {
+    this.el.grenadeRow.textContent = infinite ? '⬢ ∞' : (n > 0 ? '⬢'.repeat(n) : '');
+    this.el.grenadeRow.title = `${infinite ? 'unlimited' : n} grenades [G]`;
+  }
+
+  setRank(label) {
+    this.el.rankValue.textContent = `RANK ${label}`;
+  }
+
+  renderArsenal() {
+    if (!this.game) return;
+    const prog = this.game.progression;
+    const defs = this.game.weapons.weapons.map((w) => w.def);
+    const parts = defs.map((d, i) => {
+      const unlocked = prog.isUnlocked(d);
+      return unlocked
+        ? `<b>${i + 1}</b> ${d.name}`
+        : `<span class="locked">🔒 ${d.name} (RANK ${d.unlockRank})</span>`;
+    });
+    this.el.arsenal.innerHTML =
+      'ARSENAL: ' + parts.slice(0, 4).join(' &middot; ') + '<br>' +
+      parts.slice(4).join(' &middot; ');
+
+    const next = prog.nextUnlock(defs);
+    this.el.menuRank.textContent = next
+      ? `RANK ${prog.rankLabel} — NEXT UNLOCK: ${next.name} AT RANK ${next.unlockRank}`
+      : `RANK ${prog.rankLabel} — FULL ARSENAL UNLOCKED`;
   }
 
   setScore(score) {
@@ -139,9 +169,10 @@ export class HUD {
     }
   }
 
-  killfeed(text) {
+  killfeed(text, cls = '') {
     const div = document.createElement('div');
     div.textContent = text;
+    if (cls) div.className = cls;
     this.el.killfeed.prepend(div);
     while (this.el.killfeed.children.length > 5) {
       this.el.killfeed.lastChild.remove();
@@ -188,16 +219,21 @@ export class HUD {
     ctx.beginPath(); ctx.moveTo(C, 4); ctx.lineTo(C, S - 4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(4, C); ctx.lineTo(S - 4, C); ctx.stroke();
 
+    const showAll = !!(this.game && this.game.cheats && this.game.cheats.flags.radarAll);
     const cos = Math.cos(player.yaw);
     const sin = Math.sin(player.yaw);
-    const plot = (wx, wz) => {
+    const plot = (wx, wz, clampToRim) => {
       const dx = wx - player.position.x;
       const dz = wz - player.position.z;
       // project onto the player's right/forward axes (forward = up on the radar)
-      const rx = dx * cos - dz * sin;
-      const fw = -dx * sin - dz * cos;
+      let rx = dx * cos - dz * sin;
+      let fw = -dx * sin - dz * cos;
       const d = Math.hypot(rx, fw);
-      if (d > RANGE) return null;
+      if (d > RANGE) {
+        if (!clampToRim) return null;
+        rx *= RANGE / d;   // UAV-style: pin distant contacts to the rim
+        fw *= RANGE / d;
+      }
       const k = (C - 6) / RANGE;
       return [C + rx * k, C - fw * k];
     };
@@ -210,7 +246,7 @@ export class HUD {
 
     for (const e of enemies) {
       if (!e.alive) continue;
-      const p = plot(e.position.x, e.position.z);
+      const p = plot(e.position.x, e.position.z, showAll);
       if (!p) continue;
       ctx.fillStyle = e.type.attack === 'ranged' ? 'rgba(90, 160, 255, 0.95)' : 'rgba(255, 70, 70, 0.95)';
       ctx.beginPath();
@@ -254,12 +290,15 @@ export class HUD {
     ctx.fillRect(W / 2 - 1, 20, 2, 8);
   }
 
-  showGameOver(score, wave, kills, bestStreak, best) {
+  showGameOver(score, wave, kills, bestStreak, best, rankLine, cheated) {
     this.el.finalScore.textContent = String(score);
     this.el.finalWave.textContent = String(wave);
     this.el.finalKills.textContent = String(kills);
     this.el.finalStreak.textContent = String(bestStreak);
     this.el.bestScore.textContent = String(best);
+    this.el.finalRank.textContent = rankLine || '';
+    this.el.finalCheatnote.textContent = cheated
+      ? '⚠ CHEATS WERE ACTIVE — XP AND BEST SCORE NOT SAVED' : '';
     this.screen('gameover');
   }
 }

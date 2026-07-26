@@ -207,6 +207,59 @@
     margin-top: 26px; font-size: 12px; color: #6fb7c4; letter-spacing: 1px; line-height: 1.9;
   }
   .arsenal b { color: var(--neon); }
+  .arsenal .locked { color: #4a6570; }
+  #menu-rank { font-size: 13px; letter-spacing: 2px; color: var(--warn); margin-bottom: 20px; }
+
+  /* ---------- Cheat console ---------- */
+  #cheat-menu {
+    position: fixed; top: 50%; right: 30px; transform: translateY(-50%);
+    width: 430px; z-index: 20; display: none;
+    background: rgba(4, 9, 16, 0.92);
+    border: 1px solid rgba(255, 207, 59, 0.5);
+    border-radius: 4px; padding: 14px 0 10px;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+  }
+  #cheat-menu.visible { display: block; }
+  #cheat-menu .cm-title {
+    font-size: 16px; letter-spacing: 4px; color: var(--warn);
+    text-shadow: 0 0 10px rgba(255, 207, 59, 0.7);
+    padding: 0 16px 4px;
+  }
+  #cheat-menu .cm-hint {
+    font-size: 11px; letter-spacing: 1px; color: #7d8a99; padding: 0 16px 10px;
+    border-bottom: 1px solid rgba(255, 207, 59, 0.2);
+  }
+  #cheat-list { list-style: none; max-height: 60vh; overflow-y: auto; }
+  #cheat-list li {
+    pointer-events: auto; cursor: pointer;
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 6px 16px; font-size: 13px; letter-spacing: 1px;
+    border-left: 3px solid transparent;
+  }
+  #cheat-list li.selected {
+    background: rgba(255, 207, 59, 0.1);
+    border-left-color: var(--warn);
+  }
+  #cheat-list .cm-name { color: #e8f4ff; white-space: nowrap; }
+  #cheat-list .cm-desc { color: #667a8a; font-size: 11px; flex: 1; }
+  #cheat-list .cm-state { color: #667a8a; font-weight: bold; }
+  #cheat-list .cm-state.on { color: #4dff88; text-shadow: 0 0 8px rgba(77, 255, 136, 0.8); }
+  #cheat-list .cm-state.action { color: var(--warn); }
+
+  #cheat-frame {
+    position: fixed; inset: 0; pointer-events: none; z-index: 15; display: none;
+    border: 2px dashed rgba(255, 70, 70, 0.55);
+  }
+  #cheat-frame.visible { display: block; }
+  #cheat-badge {
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; letter-spacing: 2px; color: #ff6a6a;
+    background: rgba(30, 5, 5, 0.8); border: 1px solid rgba(255, 70, 70, 0.5);
+    padding: 2px 12px; border-radius: 3px;
+  }
+  #killfeed div.cheat {
+    border-right-color: var(--warn); color: #ffe9a8;
+  }
 </style>
 </head>
 <body>
@@ -240,6 +293,7 @@
     <div id="wave-value">1</div>
     <div id="enemies-left"></div>
     <div id="streak-value"></div>
+    <div id="rank-value" style="font-size:12px;color:#7fdceb"></div>
   </div>
 
   <div id="killfeed"></div>
@@ -254,16 +308,14 @@
 <div class="screen visible" id="menu-screen">
   <h1>NEON STRIKE</h1>
   <div class="sub">HOSTILE MACHINES DETECTED &mdash; SURVIVE THE WAVES</div>
+  <div id="menu-rank"></div>
   <button class="btn" id="start-btn">ENGAGE</button>
   <div class="controls">
     <b>W A S D</b> move &nbsp; <b>MOUSE</b> aim &nbsp; <b>LMB</b> fire &nbsp; <b>RMB</b> aim down sights &nbsp; <b>G</b> grenade<br>
     <b>SHIFT</b> sprint &nbsp; <b>CTRL / C</b> crouch &nbsp; <b>SPACE</b> jump &nbsp;
-    <b>1&ndash;8</b> / <b>WHEEL</b> weapons &nbsp; <b>R</b> reload &nbsp; <b>ESC</b> pause
+    <b>1&ndash;8</b> / <b>WHEEL</b> weapons &nbsp; <b>R</b> reload &nbsp; <b>ESC</b> pause &nbsp; <b>~ / F1</b> dev console
   </div>
-  <div class="arsenal">
-    ARSENAL: <b>1</b> P-9 SIDEARM &middot; <b>2</b> VIPER SMG &middot; <b>3</b> HELIX AR &middot; <b>4</b> JUDGE DMR<br>
-    <b>5</b> BREACHER SHOTGUN &middot; <b>6</b> BASTION LMG &middot; <b>7</b> SPECTRE SNIPER &middot; <b>8</b> HAVOC LAUNCHER
-  </div>
+  <div class="arsenal" id="arsenal"></div>
 </div>
 
 <div class="screen" id="pause-screen">
@@ -279,9 +331,18 @@
   <h1>SIGNAL LOST</h1>
   <div class="stats">
     SCORE <b id="final-score">0</b> &nbsp;&nbsp; WAVE <b id="final-wave">1</b> &nbsp;&nbsp; KILLS <b id="final-kills">0</b><br>
-    <span style="font-size:15px">BEST STREAK <b id="final-streak">0</b> &nbsp;&nbsp; BEST SCORE <b id="best-score">0</b></span>
+    <span style="font-size:15px">BEST STREAK <b id="final-streak">0</b> &nbsp;&nbsp; BEST SCORE <b id="best-score">0</b></span><br>
+    <span style="font-size:14px" id="final-rank"></span>
+    <div id="final-cheatnote" style="font-size:12px;color:#ffcf3b;letter-spacing:2px;margin-top:8px"></div>
   </div>
   <button class="btn" id="restart-btn">RE-ENGAGE</button>
+</div>
+
+<div id="cheat-frame"><div id="cheat-badge">⚠ CHEATS ACTIVE</div></div>
+<div id="cheat-menu">
+  <div class="cm-title">DEV CONSOLE</div>
+  <div class="cm-hint">&#8593;&#8595; NAVIGATE &nbsp;&middot;&nbsp; ENTER TOGGLE &nbsp;&middot;&nbsp; ~ / F1 CLOSE</div>
+  <ul id="cheat-list"></ul>
 </div>
 
 <script type="importmap">

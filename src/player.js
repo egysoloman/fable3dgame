@@ -71,7 +71,8 @@ export class Player {
     this.velocity.set(0, 0, 0);
     this.yaw = Math.PI;
     this.pitch = 0;
-    this.hp = MAX_HP;
+    this.maxHp = this.game.progression ? this.game.progression.maxHp() : MAX_HP;
+    this.hp = this.maxHp;
     this.alive = true;
     this.grounded = false;
     this.crouchToggle = false;
@@ -123,7 +124,8 @@ export class Player {
     const moveMul = (weapons ? weapons.current.def.moveMul : 1) *
       (1 - (weapons ? weapons.adsAmount : 0) * 0.25) *
       (1 - this.crouchAmount * 0.45);
-    const maxSpeed = (this.sprinting ? SPRINT_SPEED : WALK_SPEED) * moveMul;
+    const sprintSpeed = SPRINT_SPEED * this.game.progression.sprintMul();
+    const maxSpeed = (this.sprinting ? sprintSpeed : WALK_SPEED) * moveMul;
 
     // --- horizontal velocity: friction + acceleration ---
     const hv = new THREE.Vector3(this.velocity.x, 0, this.velocity.z);

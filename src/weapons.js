@@ -4,7 +4,7 @@ const HIP_POS = new THREE.Vector3(0.28, -0.26, -0.5);
 
 export const WEAPON_DEFS = [
   {
-    id: 'pistol', name: 'P-9 SIDEARM', sound: 'pistol',
+    id: 'pistol', unlockRank: 1, name: 'P-9 SIDEARM', sound: 'pistol',
     damage: 25, pellets: 1, fireDelay: 0.22, auto: false,
     spreadHip: 0.014, spreadAds: 0.004, bloom: 0.006,
     magSize: 12, reserve: Infinity, reloadTime: 0.9,
@@ -14,7 +14,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.3, bodyLen: 0.22, thickness: 0.07,
   },
   {
-    id: 'smg', name: 'VIPER SMG', sound: 'smg',
+    id: 'smg', unlockRank: 1, name: 'VIPER SMG', sound: 'smg',
     damage: 11, pellets: 1, fireDelay: 0.075, auto: true,
     spreadHip: 0.026, spreadAds: 0.012, bloom: 0.004,
     magSize: 32, reserve: 160, reloadTime: 1.4,
@@ -24,7 +24,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.3, bodyLen: 0.3, thickness: 0.075,
   },
   {
-    id: 'rifle', name: 'HELIX AR', sound: 'rifle',
+    id: 'rifle', unlockRank: 1, name: 'HELIX AR', sound: 'rifle',
     damage: 16, pellets: 1, fireDelay: 0.105, auto: true,
     spreadHip: 0.022, spreadAds: 0.006, bloom: 0.005,
     magSize: 30, reserve: 150, reloadTime: 1.7,
@@ -34,7 +34,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.5, bodyLen: 0.34, thickness: 0.085, sight: true,
   },
   {
-    id: 'dmr', name: 'JUDGE DMR', sound: 'dmr',
+    id: 'dmr', unlockRank: 2, name: 'JUDGE DMR', sound: 'dmr',
     damage: 42, pellets: 1, fireDelay: 0.28, auto: false,
     spreadHip: 0.014, spreadAds: 0.003, bloom: 0.006,
     magSize: 12, reserve: 48, reloadTime: 1.8,
@@ -44,7 +44,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.58, bodyLen: 0.36, thickness: 0.08, sight: true,
   },
   {
-    id: 'shotgun', name: 'BREACHER', sound: 'shotgun',
+    id: 'shotgun', unlockRank: 3, name: 'BREACHER', sound: 'shotgun',
     damage: 9, pellets: 8, fireDelay: 0.85, auto: false,
     spreadHip: 0.07, spreadAds: 0.05, bloom: 0.008,
     magSize: 6, reserve: 30, reloadTime: 2.2,
@@ -54,7 +54,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.44, bodyLen: 0.32, thickness: 0.105,
   },
   {
-    id: 'lmg', name: 'BASTION LMG', sound: 'lmg',
+    id: 'lmg', unlockRank: 4, name: 'BASTION LMG', sound: 'lmg',
     damage: 14, pellets: 1, fireDelay: 0.09, auto: true,
     spreadHip: 0.032, spreadAds: 0.014, bloom: 0.0045,
     magSize: 75, reserve: 150, reloadTime: 3.6,
@@ -64,7 +64,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.55, bodyLen: 0.42, thickness: 0.1, mag: true,
   },
   {
-    id: 'sniper', name: 'SPECTRE', sound: 'sniper',
+    id: 'sniper', unlockRank: 5, name: 'SPECTRE', sound: 'sniper',
     damage: 120, pellets: 1, fireDelay: 1.25, auto: false,
     spreadHip: 0.05, spreadAds: 0.0006, bloom: 0.01,
     magSize: 5, reserve: 20, reloadTime: 2.6,
@@ -74,7 +74,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.72, bodyLen: 0.38, thickness: 0.08, sight: true,
   },
   {
-    id: 'launcher', name: 'HAVOC RL', sound: 'rocket',
+    id: 'launcher', unlockRank: 6, name: 'HAVOC RL', sound: 'rocket',
     damage: 0, pellets: 0, fireDelay: 1.6, auto: false,
     spreadHip: 0.01, spreadAds: 0.004, bloom: 0,
     magSize: 1, reserve: 7, reloadTime: 2.8,
@@ -290,6 +290,7 @@ export class WeaponSystem {
 
     window.addEventListener('mousedown', (e) => {
       if (!this.game.playing || !this.game.pointerLocked) return;
+      if (this.game.cheats && this.game.cheats.open) return;
       if (e.button === 0) {
         this.triggerHeld = true;
         this.tryFire();
@@ -306,6 +307,7 @@ export class WeaponSystem {
     });
     window.addEventListener('keydown', (e) => {
       if (!this.game.playing) return;
+      if (this.game.cheats && this.game.cheats.open) return;
       const digits = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8'];
       const di = digits.indexOf(e.code);
       if (di >= 0) this.switchTo(di);
@@ -315,7 +317,13 @@ export class WeaponSystem {
     window.addEventListener('wheel', (e) => {
       if (!this.game.playing || !this.game.pointerLocked) return;
       const dir = e.deltaY > 0 ? 1 : -1;
-      this.switchTo((this.index + dir + this.weapons.length) % this.weapons.length);
+      // step to the next unlocked weapon
+      let i = this.index;
+      for (let step = 0; step < this.weapons.length; step++) {
+        i = (i + dir + this.weapons.length) % this.weapons.length;
+        if (this.game.progression.isUnlocked(this.weapons[i].def)) break;
+      }
+      this.switchTo(i);
     });
   }
 
@@ -327,7 +335,7 @@ export class WeaponSystem {
     for (const w of this.weapons) w.refill();
     for (const ex of this.explosives) ex.dispose();
     this.explosives = [];
-    this.grenades = 3;
+    this.grenades = 3 + this.game.progression.grenadeBonus();
     this.ads = false;
     this.adsAmount = 0;
     this.switchTo(0, true);
@@ -338,6 +346,14 @@ export class WeaponSystem {
   switchTo(i, silent = false) {
     if (i === this.index && !silent) return;
     if (i < 0 || i >= this.weapons.length) return;
+    if (!this.game.progression.isUnlocked(this.weapons[i].def)) {
+      if (!silent) {
+        this.game.audio.empty();
+        this.game.hud.killfeed(
+          `${this.weapons[i].def.name} LOCKED — RANK ${this.weapons[i].def.unlockRank}`, 'cheat');
+      }
+      return;
+    }
     this.current.model.visible = false;
     this.current.reloading = false;   // cancel reload on switch
     this.index = i;
@@ -350,15 +366,28 @@ export class WeaponSystem {
   startReload() {
     const w = this.current;
     if (w.reloading || w.ammo >= w.def.magSize || w.reserve <= 0) return;
+    const cheats = this.game.cheats;
+    if (cheats && cheats.flags.noReload) {
+      // instant reload: still consumes reserve, skips the animation
+      const need = w.def.magSize - w.ammo;
+      const take = w.reserve === Infinity ? need : Math.min(need, w.reserve);
+      w.ammo += take;
+      if (w.reserve !== Infinity) w.reserve -= take;
+      this.game.audio.weaponSwitch();
+      this.updateHud();
+      return;
+    }
     w.reloading = true;
-    w.reloadTimer = w.def.reloadTime;
+    w.reloadTotal = w.def.reloadTime * this.game.progression.reloadMul();
+    w.reloadTimer = w.reloadTotal;
     this.game.audio.reload(w.def.id);
     this.updateHud();
   }
 
   throwGrenade() {
-    if (this.grenades <= 0 || this.grenadeCooldown > 0) return;
-    this.grenades--;
+    const infinite = this.game.cheats && this.game.cheats.flags.infiniteGrenades;
+    if ((this.grenades <= 0 && !infinite) || this.grenadeCooldown > 0) return;
+    if (!infinite) this.grenades--;
     this.grenadeCooldown = 0.7;
     this.game.audio.grenadeThrow();
     const dir = new THREE.Vector3();
@@ -371,7 +400,8 @@ export class WeaponSystem {
   }
 
   addGrenade(n = 1) {
-    this.grenades = Math.min(GRENADE.max, this.grenades + n);
+    const cap = GRENADE.max + this.game.progression.grenadeCapBonus();
+    this.grenades = Math.min(cap, this.grenades + n);
     this.updateHud();
   }
 
@@ -400,7 +430,7 @@ export class WeaponSystem {
       return;
     }
 
-    w.ammo--;
+    if (!(this.game.cheats && this.game.cheats.flags.infiniteAmmo)) w.ammo--;
     w.cooldown = w.def.fireDelay;
     w.bloom = Math.min(w.def.bloom * 6, w.bloom + w.def.bloom);
     this.game.audio.shot(w.def.sound);
@@ -453,7 +483,9 @@ export class WeaponSystem {
         if (hitEnemyPart) {
           const enemy = hitEnemyPart.userData.enemy;
           const headshot = !!hitEnemyPart.userData.headshot;
-          enemy.takeDamage(w.def.damage * (headshot ? w.def.headshotMul : 1), end, headshot);
+          const dmg = w.def.damage * (headshot ? w.def.headshotMul : 1) *
+            this.game.progression.damageMul();
+          enemy.takeDamage(dmg, end, headshot);
         } else if (end) {
           this.game.effects.impactSparks(end);
         }
@@ -507,7 +539,7 @@ export class WeaponSystem {
     this.switchAnim = Math.max(0, this.switchAnim - dt * 4);
 
     const reloadDip = w.reloading
-      ? Math.sin(Math.min(1, 1 - w.reloadTimer / w.def.reloadTime) * Math.PI) * 0.18
+      ? Math.sin(Math.min(1, 1 - w.reloadTimer / (w.reloadTotal || w.def.reloadTime)) * Math.PI) * 0.18
       : 0;
     const sprintRaise = this.sprintBlocked ? 1 : 0;
     this._sprintRaiseSmooth = (this._sprintRaiseSmooth || 0);
@@ -557,6 +589,7 @@ export class WeaponSystem {
   updateHud() {
     const w = this.current;
     this.game.hud.setAmmo(w.def.name, w.ammo, w.reserve, w.reloading);
-    this.game.hud.setGrenades(this.grenades);
+    this.game.hud.setGrenades(this.grenades,
+      !!(this.game.cheats && this.game.cheats.flags.infiniteGrenades));
   }
 }
