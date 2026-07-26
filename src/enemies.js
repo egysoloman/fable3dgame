@@ -189,7 +189,7 @@ class Enemy {
     }
     g.scale.setScalar(this.type.scale);
 
-    const target = this._pickTarget();
+    let target = this._pickTarget();
     const toTarget = new THREE.Vector3();
     let dist = 999;
     if (target) {
@@ -197,6 +197,8 @@ class Enemy {
       toTarget.y = 0;
       dist = toTarget.length();
       if (dist > 0.001) toTarget.divideScalar(dist);
+      const aggro = this.game.enemies.aggroRange;
+      if (aggro && dist > aggro) { target = null; dist = 999; } // zone guards hold position
     }
 
     // --- steering ---

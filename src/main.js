@@ -11,6 +11,7 @@ import { Progression, PERKS } from './progression.js';
 import { CheatSystem } from './cheats.js';
 import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
+import { DominationManager } from './domination.js';
 import { Warfare, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
 
@@ -77,6 +78,7 @@ class Game {
     this.cheats = new CheatSystem(this, CHEATS_ENABLED);
     this.mp = new Multiplayer(this);
     this.soldiers = new SoldierManager(this);
+    this.domination = new DominationManager(this);
     this.warfare = new Warfare(this);
     this.mode = 'survival';
     this.setup = { mode: 'survival', map: 'arena', equip: loadEquip() };
@@ -226,10 +228,10 @@ class Game {
         ui.renderSetup();
       },
       renderSetup() {
-        for (const m of ['survival', 'strike']) {
+        for (const m of ['survival', 'strike', 'domination']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
-        for (const m of ['arena', 'battlefield']) {
+        for (const m of ['arena', 'battlefield', 'station']) {
           $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
         }
         for (const eq of EQUIP_DEFS) {
@@ -362,10 +364,10 @@ class Game {
       setLang(nextLang());
       ui.refreshText();
     });
-    for (const m of ['survival', 'strike']) {
+    for (const m of ['survival', 'strike', 'domination']) {
       $(`mode-${m}`).addEventListener('click', () => { game.setup.mode = m; ui.saveSetup(); });
     }
-    for (const m of ['arena', 'battlefield']) {
+    for (const m of ['arena', 'battlefield', 'station']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
     }
     for (const eq of EQUIP_DEFS) {
@@ -382,7 +384,8 @@ class Game {
     }
     $('lobby-map-btn').addEventListener('click', () => {
       // host cycles the co-op map
-      game.setup.map = game.setup.map === 'arena' ? 'battlefield' : 'arena';
+      const cycle = ['arena', 'battlefield', 'station'];
+      game.setup.map = cycle[(cycle.indexOf(game.setup.map) + 1) % cycle.length];
       ui.saveSetup();
       $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
     });
@@ -519,9 +522,11 @@ class Game {
     this.world.load(this.setup.map);
     this.warfare.reset();
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
-    this.enemies = this.mode === 'strike' ? this.soldiers : this.enemiesSolo;
-    if (this.mode === 'strike') this.enemiesSolo.reset();
-    else this.soldiers.reset();
+    this.enemies = this.mode === 'strike' ? this.soldiers
+      : this.mode === 'domination' ? this.domination : this.enemiesSolo;
+    for (const mgr of [this.enemiesSolo, this.soldiers, this.domination]) {
+      if (mgr !== this.enemies) mgr.reset();
+    }
     this._resetRunState();
     this.warfare.spawnVehicles();
     this.enemies.startGame();
@@ -530,6 +535,13 @@ class Game {
   strikeFinished(win, kills) {
     document.querySelector('#gameover-screen h1').textContent =
       t(win ? 'strike.win' : 'strike.lose');
+    this._finishRun();
+  }
+
+  domFinished(win) {
+    document.querySelector('#gameover-screen h1').textContent =
+      t(win ? 'strike.win' : 'strike.lose');
+    this.hud.subbanner('');
     this._finishRun();
   }
 

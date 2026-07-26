@@ -66,6 +66,7 @@ export const MAPS = {
       [-24, 0x27e8ff, -24], [24, 0xff3bd4, -24], [-24, 0xffb347, 24], [24, 0x27ff8a, 24],
     ],
     playerSpawn: [0, 10],
+    domPoints: [[-13, -13], [13, 13], [0, -20]],
     vehicles: [],
     build(w) {
       const rand = mulberry32(1337);
@@ -105,6 +106,7 @@ export const MAPS = {
       [0, 0xffa04a, 0],
     ],
     playerSpawn: [0, 52],
+    domPoints: [[-18, -18], [18, 18], [0, 0]],
     vehicles: [[-6, 46, 0.5], [6, 46, -0.5]], // hoverbike pads: x, z, yaw
     build(w) {
       const rand = mulberry32(4242);
@@ -161,6 +163,52 @@ export const MAPS = {
       }
 
       w.spawnPoints = w.ringSpawns(12, S / 2 - 6);
+    },
+  },
+
+  station: {
+    id: 'station',
+    size: 80,
+    fog: [0x04060c, 22, 90],
+    bg: 0x04060c,
+    hemi: [0x9fb8d8, 0x0a0e18, 1.0],
+    sun: [0xcfe4ff, 1.1],
+    floorColors: ['#0a0e18', '#22344a', '#5accdd'],
+    accents: [
+      [-28, 0x62f0ff, -28], [28, 0xffffff, -28], [-28, 0x62f0ff, 28],
+      [28, 0xffffff, 28], [0, 0x8affd0, 0],
+    ],
+    playerSpawn: [0, 30],
+    domPoints: [[-24, 0], [24, 0], [0, -24]],
+    vehicles: [],
+    gravityMul: 0.55,   // low-grav: float on jumps
+    build(w) {
+      // central reactor core
+      w.addBox(0, 3, 0, 3, 6, 3, w.mats.pillar);
+      w.addTrim(0, 1.4, 0, 3.2, 0.3, 3.2);
+      w.addTrim(0, 4.6, 0, 3.2, 0.3, 3.2);
+
+      // module walls forming four rooms with door gaps (CQB corridors)
+      const H = 4;
+      for (const s of [-1, 1]) {
+        // long corridor walls with two gaps each
+        w.addBox(s * 14, H / 2, -10, 1, H, 20, w.mats.bunker);
+        w.addBox(s * 14, H / 2, 15, 1, H, 12, w.mats.bunker);
+        w.addBox(-10, H / 2, s * 14, 20, H, 1, w.mats.bunker);
+        w.addBox(15, H / 2, s * 14, 12, H, 1, w.mats.bunker);
+        w.addTrim(s * 14, H + 0.1, 0, 1.1, 0.15, 30);
+        w.addTrim(0, H + 0.1, s * 14, 30, 0.15, 1.1);
+      }
+      // cargo pods scattered in the rooms
+      const spots = [
+        [-24, -24, 2.2], [24, -22, 1.8], [-22, 24, 2.0], [25, 25, 2.4],
+        [-7, -24, 1.4], [24, 7, 1.4], [-24, 6, 1.6], [8, 24, 1.4],
+        [-7, 7, 1.2], [7, -7, 1.2],
+      ];
+      for (const [x, z, size] of spots) {
+        w.addBox(x, size / 2, z, size, size, size, w.mats.container);
+      }
+      w.spawnPoints = w.ringSpawns(10, this.size / 2 - 5);
     },
   },
 };

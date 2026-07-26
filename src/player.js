@@ -157,7 +157,7 @@ export class Player {
       this.crouchToggle = false;
       this.game.audio.jump();
     }
-    this.velocity.y -= GRAVITY * dt;
+    this.velocity.y -= GRAVITY * (this.game.world.map.gravityMul || 1) * dt;
 
     // --- integrate with collision, axis by axis ---
     this.wasGrounded = this.grounded;
