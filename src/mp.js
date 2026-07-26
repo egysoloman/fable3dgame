@@ -50,8 +50,10 @@ class RemotePlayer {
       { color: 0x27b8d8, eyeColor: 0xbfffff, scale: 1 }, false);
     this.group = body.group;
     this.parts = body;
+    this.group.traverse((o) => { o.userData.rp = this; });
     this.tag = makeNameSprite(name);
     this.tag.position.y = 2.35;
+    this.tag.raycast = () => {};
     this.group.add(this.tag);
     this.group.position.copy(this.position);
     game.scene.add(this.group);
@@ -336,6 +338,30 @@ export class Multiplayer {
     this.snapAcc = 0;
     this.overSent = false;
     this._overTimer = 0;
+    this.matchMode = 'survival';
+    this.matchTimer = 0;
+    this.lastAttacker = null;
+    this.pvpRespawn = 0;
+  }
+
+  get versus() {
+    return this.active && this.matchMode === 'versus';
+  }
+
+  pvpTargets() {
+    return [...this.remotes.values()].filter((r) => r.alive).map((r) => r.group);
+  }
+
+  sendPvpHit(id, dmg, pos) {
+    this.relayTo(id, {
+      k: 'pvpHit', dmg: Math.round(dmg),
+      sx: +this.game.player.position.x.toFixed(1),
+      sz: +this.game.player.position.z.toFixed(1),
+    });
+  }
+
+  sendBikeState(i, on) {
+    this.relay({ k: 'bike', i, on: on ? 1 : 0 });
   }
 
   // ---- connection ----
@@ -400,7 +426,7 @@ export class Multiplayer {
   joinRoom(code) { this.send({ t: 'join', code }); }
   leaveRoom() { this.send({ t: 'leave' }); }
   setReady(v) { this.send({ t: 'ready', v }); }
-  requestStart(map) { this.send({ t: 'start', map }); }
+  requestStart(map, mode) { this.send({ t: 'start', map, mode }); }
 
   inRoom() { return !!this.room; }
 
@@ -435,7 +461,7 @@ export class Multiplayer {
         game.ui.showMpBrowser();
         break;
       case 'started':
-        this._startMatch(msg.hostId === this.myId, msg.map || 'arena');
+        this._startMatch(msg.hostId === this.myId, msg.map || 'arena', msg.mode || 'survival');
         break;
       case 'hostLeft':
         if (this.active) this._endMatch('hostLeft');
@@ -525,6 +551,30 @@ export class Multiplayer {
         game.hud.killfeed(t('mp.playerDown', { player: name }), 'cheat');
         break;
       }
+      case 'bike': {
+        game.warfare.setRemoteBike(d.i, !!d.on);
+        break;
+      }
+      case 'pvpHit': {
+        this.lastAttacker = from;
+        game.player.takeDamage(d.dmg, d.sx !== undefined
+          ? new THREE.Vector3(d.sx, 0, d.sz) : null, 'bullet');
+        break;
+      }
+      case 'pvpDeath': {
+        // sent by the victim; d.by is the killer
+        const killer = this._nameOf(d.by);
+        const victim = this._nameOf(from);
+        const entry = this.scores.get(d.by);
+        if (entry) { entry.kills++; entry.score += 100; }
+        if (d.by === this.myId) {
+          game.addScore(100);
+          game.addKillMp();
+          game.hud.hitmarker(true);
+        }
+        game.hud.killfeed(t('mp.playerKilled', { player: killer, enemy: victim }));
+        break;
+      }
       case 'over': {
         if (!this.isHost) this._endMatch('over');
         break;
@@ -542,17 +592,21 @@ export class Multiplayer {
   }
 
   // ---- match lifecycle ----
-  _startMatch(isHost, map = 'arena') {
+  _startMatch(isHost, map = 'arena', mode = 'survival') {
     this.active = true;
     this.map = map;
+    this.matchMode = mode;
+    this.matchTimer = 240;
+    this.lastAttacker = null;
+    this.pvpRespawn = 0;
     this.isHost = isHost;
     this.overSent = false;
     this.scores.clear();
     for (const p of this.room.players) {
       this.scores.set(p.id, { name: p.name, score: 0, kills: 0 });
     }
-    this.replicas = isHost ? null : new ReplicaManager(this.game, this);
-    this.game.startMatch(this, map);
+    this.replicas = (isHost || mode === 'versus') ? null : new ReplicaManager(this.game, this);
+    this.game.startMatch(this, map, mode);
     this._syncMatchPlayers();
   }
 
@@ -590,7 +644,19 @@ export class Multiplayer {
   }
 
   onLocalDeath() {
-    this.relay({ k: 'down' });
+    if (this.versus) {
+      const by = this.lastAttacker || this.myId;
+      const mine = this.scores.get(this.myId);
+      this.relay({ k: 'pvpDeath', by });
+      const entry = this.scores.get(by);
+      if (entry && by !== this.myId) { entry.kills++; entry.score += 100; }
+      this.game.hud.killfeed(t('mp.playerKilled', {
+        player: this._nameOf(by), enemy: this.name }));
+      this.pvpRespawn = 3;
+      if (mine) mine.score = this.game.score;
+    } else {
+      this.relay({ k: 'down' });
+    }
     this.game.weapons.rig.visible = false;
     this.game.hud.setScope(false);
     document.getElementById('spectate-note').classList.add('visible');
@@ -692,6 +758,27 @@ export class Multiplayer {
         yaw: +p.yaw.toFixed(2), c: +p.crouchAmount.toFixed(1),
         a: p.alive ? 1 : 0, hp: Math.round(p.hp),
       });
+    }
+
+    // versus: self-managed respawn + shared end conditions
+    if (this.versus) {
+      if (this.pvpRespawn > 0) {
+        this.pvpRespawn -= dt;
+        if (this.pvpRespawn <= 0) this._respawnLocal();
+      }
+      const mine = this.scores.get(this.myId);
+      this.game.hud.setWave(`${mine ? mine.kills : 0}/15`);
+      this.matchTimer -= dt;
+      if (this.isHost && !this.overSent) {
+        const maxKills = Math.max(0, ...[...this.scores.values()].map((s) => s.kills));
+        if (maxKills >= 15 || this.matchTimer <= 0) {
+          this.overSent = true;
+          this.relay({ k: 'over' });
+          this.send({ t: 'end' });
+          this._endMatch('over');
+        }
+      }
+      return;
     }
 
     // host: broadcast enemy snapshots + detect match over

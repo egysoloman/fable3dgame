@@ -12,7 +12,7 @@ import { CheatSystem } from './cheats.js';
 import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
 import { Warfare, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
-import { t, setLang, getLang, applyDom } from './i18n.js';
+import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
 
 const BEST_KEY = 'neonstrike.best';
 const SETTINGS_KEY = 'neonstrike.settings';
@@ -191,7 +191,7 @@ class Game {
     const ui = {
       syncLangButton() {
         const btn = $('lang-btn');
-        btn.textContent = getLang() === 'en' ? '繁體中文' : 'English';
+        btn.textContent = LANG_LABELS[nextLang()];
         btn.classList.toggle('visible', game.state !== 'playing');
       },
       refreshText() {
@@ -318,6 +318,7 @@ class Game {
         const amHost = room.hostId === game.mp.myId;
         $('lobby-map-row').style.display = amHost ? '' : 'none';
         $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
+        $('lobby-mode-btn').textContent = t(`mode.${game.mpMode || 'survival'}`);
         $('ready-btn').style.display = amHost ? 'none' : '';
         $('ready-btn').textContent = meReady ? t('mp.unready') : t('mp.ready');
         $('start-match-btn').style.display = amHost ? '' : 'none';
@@ -350,7 +351,7 @@ class Game {
     $('start-match-btn').addEventListener('click', () => {
       game.audio.init();
       game.applyVolume();
-      game.mp.requestStart(game.setup.map);
+      game.mp.requestStart(game.setup.map, game.mpMode || 'survival');
     });
     $('leave-lobby-btn').addEventListener('click', () => {
       game.mp.leaveRoom();
@@ -358,7 +359,7 @@ class Game {
     });
     $('mpover-lobby-btn').addEventListener('click', () => ui.showLobby());
     $('lang-btn').addEventListener('click', () => {
-      setLang(getLang() === 'en' ? 'zh-TW' : 'en');
+      setLang(nextLang());
       ui.refreshText();
     });
     for (const m of ['survival', 'strike']) {
@@ -384,6 +385,10 @@ class Game {
       game.setup.map = game.setup.map === 'arena' ? 'battlefield' : 'arena';
       ui.saveSetup();
       $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
+    });
+    $('lobby-mode-btn').addEventListener('click', () => {
+      game.mpMode = game.mpMode === 'versus' ? 'survival' : 'versus';
+      $('lobby-mode-btn').textContent = t(`mode.${game.mpMode}`);
     });
 
     return ui;
@@ -529,17 +534,18 @@ class Game {
   }
 
   // multiplayer match entry (called by Multiplayer on 'started')
-  startMatch(mp, map = 'arena') {
+  startMatch(mp, map = 'arena', mode = 'survival') {
     if (this.cheats.anyActive()) {
       this.hud.killfeed(t('mp.cheatsDisabled'), 'cheat');
     }
     this.cheats.suspend(true);
     this.cheatsUsedThisRun = false;
-    this.mode = 'survival';
+    this.mode = mode;
     this.world.load(map);
     this.warfare.reset();
     this.soldiers.reset();
-    if (mp.isHost) {
+    if (mode === 'versus' || mp.isHost) {
+      this.enemiesSolo.reset();
       this.enemies = this.enemiesSolo;
     } else {
       this.enemiesSolo.reset();
@@ -547,7 +553,17 @@ class Game {
     }
     this._resetRunState();
     this.warfare.spawnVehicles();
-    if (mp.isHost) this.enemies.startGame();
+    if (mode === 'versus') {
+      // FFA: scatter spawns, no AI waves
+      const pts = this.world.spawnPoints;
+      const sp = pts[Math.floor(Math.random() * pts.length)];
+      this.player.position.set(sp.x, 0, sp.z);
+      this.hud.setWave('0/15');
+      this.hud.subbanner(t('versus.target', { n: 15 }));
+      setTimeout(() => this.hud.subbanner(''), 3000);
+    } else if (mp.isHost) {
+      this.enemies.startGame();
+    }
     this.requestLock(); // clients may lack a gesture; click-to-lock recovers
   }
 
@@ -564,6 +580,15 @@ class Game {
     if (document.pointerLockElement) document.exitPointerLock();
 
     if (reason === 'over' || reason === 'hostLeft') {
+      if (this.mode === 'versus') {
+        const mine = scores.get(this.mp.myId);
+        const best = Math.max(0, ...[...scores.values()].map((s) => s.kills));
+        const won = mine && mine.kills >= best && best > 0;
+        document.querySelector('#mpover-screen h2').textContent =
+          t(won ? 'versus.win' : 'versus.lose');
+      } else {
+        document.querySelector('#mpover-screen h2').textContent = t('mp.matchOver');
+      }
       const wrap = document.getElementById('mp-scores');
       wrap.innerHTML = '';
       const rows = [...scores.values()].sort((a, b) => b.score - a.score);
@@ -744,6 +769,23 @@ class Game {
         let falloff = Math.max(0.3, 1 - d / radius);
         if (this._splashBlocked(origin, center)) falloff *= 0.25;
         e.takeDamage(dmg * falloff, center, false);
+      }
+    }
+
+    for (const b of this.warfare.bikes) {
+      if (b.destroyed) continue;
+      const bd = Math.hypot(b.position.x - pos.x, b.position.z - pos.z);
+      if (bd < radius) b.takeDamage(dmg * Math.max(0.3, 1 - bd / radius) * 0.8);
+    }
+
+    if (this.mp.versus) {
+      for (const r of this.mp.remoteList()) {
+        if (!r.alive) continue;
+        const center = new THREE.Vector3(r.position.x, r.position.y + 1, r.position.z);
+        const d = center.distanceTo(pos);
+        if (d < radius && !this._splashBlocked(origin, center)) {
+          this.mp.sendPvpHit(r.id, dmg * Math.max(0.3, 1 - d / radius) * 0.6, center);
+        }
       }
     }
 

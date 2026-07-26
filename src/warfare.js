@@ -128,12 +128,19 @@ class Helicopter {
 
 // ---------- rideable hoverbike ----------
 class Hoverbike {
-  constructor(game, x, z, yaw) {
+  constructor(game, x, z, yaw, index) {
     this.game = game;
+    this.index = index;
+    this.home = { x, z, yaw };
     this.position = new THREE.Vector3(x, 0, z);
     this.yaw = yaw;
     this.speed = 0;
     this.mounted = false;
+    this.remoteOccupied = false;
+    this.hp = 150;
+    this.maxHp = 150;
+    this.destroyed = false;
+    this.respawnTimer = 0;
     this.bob = Math.random() * 6;
 
     const g = new THREE.Group();
@@ -161,9 +168,48 @@ class Hoverbike {
 
   _sync(dt) {
     this.bob += dt * 3;
+    this.group.visible = !this.destroyed && !this.remoteOccupied;
     this.group.position.set(
       this.position.x, this.position.y + Math.sin(this.bob) * 0.05, this.position.z);
     this.group.rotation.y = this.yaw;
+  }
+
+  takeDamage(dmg) {
+    if (this.destroyed) return;
+    this.hp -= dmg;
+    if (this.hp <= 0) this.destroy();
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.respawnTimer = 20;
+    const pos = this.position.clone();
+    pos.y += 0.6;
+    this.game.effects.explosion(pos);
+    this.game.audio.explosion();
+    this.game.hud.killfeed(t('vehicle.destroyed'), 'cheat');
+    const p = this.game.player;
+    if (p.vehicle === this) {
+      p.vehicle = null;
+      this.mounted = false;
+      this.game.weapons.rig.visible = true;
+      p.takeDamage(30, pos, 'splash');
+      if (this.game.mp.active) this.game.mp.sendBikeState(this.index, false);
+    }
+  }
+
+  tickRespawn(dt) {
+    if (!this.destroyed) return;
+    this.respawnTimer -= dt;
+    if (this.respawnTimer <= 0) {
+      this.destroyed = false;
+      this.hp = this.maxHp;
+      this.position.set(this.home.x, 0, this.home.z);
+      this.yaw = this.home.yaw;
+      this.speed = 0;
+      this.game.effects.spawnPortal(this.position, 0xb06aff);
+    }
   }
 
   // driving model: throttle + steer scaled by speed, light drift
@@ -187,7 +233,7 @@ class Hoverbike {
     this.position.x = Math.max(-half, Math.min(half, this.position.x));
     this.position.z = Math.max(-half, Math.min(half, this.position.z));
 
-    // ram damage
+    // ram damage (the bike takes wear too)
     if (Math.abs(this.speed) > 8) {
       for (const e of this.game.enemies.list) {
         if (!e.alive) continue;
@@ -195,6 +241,7 @@ class Hoverbike {
         if (d < 1.5) {
           e.takeDamage(95, new THREE.Vector3(e.position.x, 1, e.position.z), false);
           this.speed *= 0.6;
+          this.takeDamage(8);
           this.game.player.addShake(0.06);
         }
       }
@@ -245,9 +292,9 @@ export class Warfare {
   spawnVehicles() {
     for (const b of this.bikes) b.dispose();
     this.bikes = [];
-    for (const v of this.game.world.vehicleSpawns) {
-      this.bikes.push(new Hoverbike(this.game, v.x, v.z, v.yaw));
-    }
+    this.game.world.vehicleSpawns.forEach((v, i) => {
+      this.bikes.push(new Hoverbike(this.game, v.x, v.z, v.yaw, i));
+    });
     if (this.heli) { this.game.scene.remove(this.heli.group); this.heli = null; }
   }
 
@@ -257,6 +304,14 @@ export class Warfare {
     this.game.hud.killfeed(t('streakr.heli'), 'cheat');
   }
 
+  setRemoteBike(index, occupied) {
+    const b = this.bikes[index];
+    if (b) {
+      b.remoteOccupied = occupied;
+      b._sync(0);
+    }
+  }
+
   toggleMount() {
     const p = this.game.player;
     if (p.vehicle) {
@@ -264,6 +319,7 @@ export class Warfare {
       const bike = p.vehicle;
       bike.mounted = false;
       p.vehicle = null;
+      if (this.game.mp.active) this.game.mp.sendBikeState(bike.index, false);
       p.position.set(
         bike.position.x + Math.cos(bike.yaw) * 1.2, bike.position.y,
         bike.position.z - Math.sin(bike.yaw) * 1.2);
@@ -272,6 +328,7 @@ export class Warfare {
     }
     if (!p.alive) return;
     for (const bike of this.bikes) {
+      if (bike.destroyed || bike.remoteOccupied) continue;
       const d = Math.hypot(bike.position.x - p.position.x, bike.position.z - p.position.z);
       if (d < 2.4) {
         p.vehicle = bike;
@@ -280,6 +337,7 @@ export class Warfare {
         this.game.weapons.triggerHeld = false;
         this.game.weapons.ads = false;
         this.game.hud.killfeed(t('vehicle.mounted'), 'cheat');
+        if (this.game.mp.active) this.game.mp.sendBikeState(bike.index, true);
         return;
       }
     }
@@ -289,6 +347,7 @@ export class Warfare {
     if (this.heli && !this.heli.update(dt)) this.heli = null;
     const p = this.game.player;
     for (const b of this.bikes) {
+      b.tickRespawn(dt);
       if (!b.mounted) b._sync(dt);
     }
     if (p.vehicle) p.vehicle.drive(dt);

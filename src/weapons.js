@@ -530,6 +530,9 @@ export class WeaponSystem {
         ...this.game.world.colliderMeshes,
         ...this.game.enemies.aliveGroups(),
       ];
+      if (this.game.mp && this.game.mp.versus) {
+        targets.push(...this.game.mp.pvpTargets());
+      }
       const spread = this.currentSpread();
       let lastEnd = null;
       for (let p = 0; p < w.def.pellets; p++) {
@@ -543,9 +546,15 @@ export class WeaponSystem {
         const hits = this.raycaster.intersectObjects(targets, true);
         let end = null;
         let hitEnemyPart = null;
+        let hitRp = null;
         const pierced = [];
         for (const h of hits) {
           if (!h.object.visible) continue;
+          if (h.object.userData.rp) {
+            end = h.point;
+            hitRp = h.object.userData.rp;
+            break;
+          }
           if (w.def.pierce && h.object.userData.enemy) {
             // rail slug passes through bodies until it meets world geometry
             const en = h.object.userData.enemy;
@@ -568,7 +577,12 @@ export class WeaponSystem {
             this.game.progression.damageMul();
           q.enemy.takeDamage(dmg, q.point, q.headshot);
         }
-        if (hitEnemyPart) {
+        if (hitRp) {
+          this.game.effects.enemyHitSparks(end);
+          this.game.hud.hitmarker(false);
+          this.game.audio.hit(false);
+          this.game.mp.sendPvpHit(hitRp.id, w.def.damage * 0.8, end);
+        } else if (hitEnemyPart) {
           const enemy = hitEnemyPart.userData.enemy;
           const headshot = !!hitEnemyPart.userData.headshot;
           const dmg = w.def.damage * (headshot ? w.def.headshotMul : 1) *

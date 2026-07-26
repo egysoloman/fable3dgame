@@ -142,6 +142,11 @@ const STRINGS = {
     'strike.redeploy': 'REDEPLOY IN {s}',
     'strike.timer': '{s}s REMAINING',
     'enemy.soldier': 'SOLDIER',
+    'mode.versus': 'VERSUS', 'mode.versus.d': 'free-for-all PvP, first to 15 kills',
+    'versus.win': 'VICTORY',
+    'versus.lose': 'DEFEATED',
+    'versus.target': 'TARGET: {n} KILLS',
+    'vehicle.destroyed': 'VEHICLE DESTROYED!',
 
     // weapons
     'weapon.pistol': 'P-9 SIDEARM',
@@ -304,6 +309,11 @@ const STRINGS = {
     'strike.redeploy': '{s} 秒後重新部署',
     'strike.timer': '剩餘 {s} 秒',
     'enemy.soldier': '敵方士兵',
+    'mode.versus': '玩家對戰', 'mode.versus.d': '自由混戰，先達 15 殺獲勝',
+    'versus.win': '勝利',
+    'versus.lose': '戰敗',
+    'versus.target': '目標：{n} 殺',
+    'vehicle.destroyed': '載具被摧毀！',
 
     'weapon.pistol': 'P-9 手槍',
     'weapon.smg': 'VIPER 衝鋒槍',
@@ -331,6 +341,156 @@ const STRINGS = {
     'streak.15': '勢不可擋',
     'streak.20': '如神附體',
   },
+  'zh-CN': {
+    'menu.subtitle': '侦测到敌对机械 — 在波次中生存下来',
+    'menu.solo': '单人游戏',
+    'menu.multiplayer': '多人游戏',
+    'menu.controls': '<b>W A S D</b> 移动 · <b>鼠标</b> 瞄准 · <b>左键</b> 开火 · <b>右键</b> 开镜瞄准 · <b>G</b> 手雷<br><b>SHIFT</b> 冲刺 · <b>C / CTRL</b> 下蹲 · <b>SPACE</b> 跳跃 · <b>1–8</b> / <b>滚轮</b> 切换武器 · <b>R</b> 换弹 · <b>ESC</b> 暂停 · <b>~ / F1</b> 开发者控制台',
+    'menu.arsenal': '武器库',
+    'menu.rank': '等级 {rank}',
+    'menu.nextUnlock': '等级 {rank} — 下一解锁：{weapon}（等级 {need}）',
+    'menu.fullArsenal': '等级 {rank} — 武器库全部解锁',
+    'menu.locked': '🔒 {weapon}（等级 {need}）',
+    'mp.title': '多人游戏',
+    'mp.subtitle': '合作波次生存 — 最多 4 名干员',
+    'mp.nickname': '代号',
+    'mp.create': '创建房间',
+    'mp.joinCode': '房间代码',
+    'mp.join': '加入',
+    'mp.rooms': '开放房间',
+    'mp.refresh': '刷新',
+    'mp.noRooms': '当前没有房间 — 创建一个吧',
+    'mp.back': '返回',
+    'mp.connecting': '连接中…',
+    'mp.offline': '服务器离线 — 仅限单人游戏。运行 `npm start` 以开设房间。',
+    'mp.room': '房间 {code}',
+    'mp.players': '干员',
+    'mp.ready': '准备完毕',
+    'mp.unready': '未准备',
+    'mp.start': '开始任务',
+    'mp.leave': '离开',
+    'mp.waitHost': '等待房主开始…',
+    'mp.waitReady': '等待所有干员准备',
+    'mp.host': '房主',
+    'mp.inMatch': '进行中',
+    'mp.err.noRoom': '找不到房间',
+    'mp.err.roomFull': '房间已满',
+    'mp.err.serverFull': '服务器已满',
+    'mp.err.notReady': '还有干员未准备',
+    'mp.err.lost': '连接中断',
+    'mp.hostLeft': '房主已离开 — 对局结束',
+    'mp.joined': '{name} 加入了',
+    'mp.left': '{name} 离开了',
+    'mp.spectating': '已阵亡 — 下一波重新部署',
+    'mp.matchOver': '任务失败',
+    'mp.backToLobby': '返回大厅',
+    'mp.score': '分数',
+    'mp.kills': '击杀',
+    'mp.playerKilled': '{player} 消灭了 {enemy}',
+    'mp.playerDown': '{player} 已阵亡',
+    'mp.cheatsDisabled': '多人游戏中已禁用作弊',
+    'hud.integrity': '机体完整度',
+    'hud.score': '分数',
+    'hud.wave': '波次',
+    'hud.rank': '等级 {rank}',
+    'hud.hostiles': '敌人：{n}',
+    'hud.streak': '连杀 ×{n}',
+    'hud.reload': '[R] 换弹',
+    'hud.grenades': '{n} 枚手雷 [G]',
+    'banner.survive': '生存下去',
+    'banner.wave': '第 {n} 波',
+    'banner.waveClear': '波次肃清',
+    'banner.nextWave': '下一波 {s} 秒后来袭',
+    'banner.rank': '等级 {rank}',
+    'feed.eliminated': '已消灭{enemy}',
+    'feed.unlocked': '已解锁 {weapon}',
+    'feed.perk': '特长：{perk}',
+    'feed.locked': '{weapon} 未解锁 — 需要等级 {need}',
+    'feed.cheatOn': '作弊：{cheat} 开启',
+    'feed.cheatOff': '作弊：{cheat} 关闭',
+    'feed.cheatsReset': '作弊已全部重置',
+    'feed.waveForced': '作弊：强制生成波次',
+    'feed.startRun': '请先开始游戏',
+    'pause.title': '已暂停',
+    'pause.resume': '继续',
+    'pause.sensitivity': '灵敏度',
+    'pause.volume': '音量',
+    'pause.language': '语言',
+    'over.title': '信号中断',
+    'over.score': '分数',
+    'over.wave': '波次',
+    'over.kills': '击杀',
+    'over.bestStreak': '最佳连杀',
+    'over.bestScore': '最佳分数',
+    'over.restart': '再次出击',
+    'over.rank': '等级 {rank}',
+    'over.rankXp': '等级 {rank} — {xp} / {next} XP',
+    'over.cheated': '⚠ 曾启用作弊 — XP 与最佳分数不予保存',
+    'cheat.title': '开发者控制台',
+    'cheat.hint': '↑↓ 选择 · ENTER 切换 · ~ / F1 关闭',
+    'cheat.active': '⚠ 作弊启用中（{n}）',
+    'cheat.god': '无敌模式', 'cheat.god.d': '玩家不受任何伤害',
+    'cheat.infiniteAmmo': '无限弹药', 'cheat.infiniteAmmo.d': '弹匣永不减少',
+    'cheat.noReload': '免换弹', 'cheat.noReload.d': '换弹立即完成',
+    'cheat.instantKill': '一击必杀', 'cheat.instantKill.d': '任何攻击直接消灭敌人',
+    'cheat.unlockAll': '解锁所有武器', 'cheat.unlockAll.d': '无视等级获得全部武器',
+    'cheat.maxLevel': '最高等级', 'cheat.maxLevel.d': '最高等级并启用所有特长',
+    'cheat.slowMotion': '慢动作', 'cheat.slowMotion.d': '电影感 45% 游戏速度',
+    'cheat.radarAll': '全域雷达', 'cheat.radarAll.d': '雷达显示所有敌人',
+    'cheat.infiniteGrenades': '无限手雷', 'cheat.infiniteGrenades.d': '投掷物用之不竭',
+    'cheat.spawnWave': '生成下一波', 'cheat.spawnWave.d': '立即强制下一波来袭',
+    'cheat.reset': '重置所有作弊', 'cheat.reset.d': '关闭全部作弊',
+    'setup.title': '任务设置',
+    'setup.mode': '模式',
+    'setup.map': '地图',
+    'setup.equip': '装备（选 2 项）',
+    'setup.deploy': '部署出击',
+    'mode.survival': '生存模式', 'mode.survival.d': '无尽机械波次',
+    'mode.strike': '小队突击', 'mode.strike.d': '对抗持枪 AI 士兵，达成 30 次消灭',
+    'mode.versus': '玩家对战', 'mode.versus.d': '自由混战，先达 15 杀获胜',
+    'map.arena': '霓虹竞技场',
+    'map.battlefield': 'K 区大战场',
+    'equip.plates': '防弹插板', 'equip.plates.d': '蓝色护甲优先吸收伤害',
+    'equip.helmet': '战斗头盔', 'equip.helmet.d': '爆炸伤害 -40%、枪火 -25%',
+    'equip.stim': '强化针剂', 'equip.stim.d': '生命恢复更快',
+    'equip.boots': '突袭战靴', 'equip.boots.d': '速度 +8%、跳得更高',
+    'vehicle.hint': '[E] 骑乘',
+    'vehicle.mounted': '悬浮摩托 — W/S 油门 · A/D 转向 · E 下车',
+    'vehicle.destroyed': '载具被摧毁！',
+    'streakr.resupply': '补给空投',
+    'streakr.railgun': 'AEGIS 磁轨炮上线',
+    'streakr.heli': '攻击直升机抵达',
+    'strike.win': '任务完成',
+    'strike.lose': '任务失败',
+    'strike.redeploy': '{s} 秒后重新部署',
+    'strike.timer': '剩余 {s} 秒',
+    'enemy.soldier': '敌方士兵',
+    'versus.win': '胜利',
+    'versus.lose': '战败',
+    'versus.target': '目标：{n} 杀',
+    'weapon.pistol': 'P-9 手枪',
+    'weapon.smg': 'VIPER 冲锋枪',
+    'weapon.rifle': 'HELIX 突击步枪',
+    'weapon.dmr': 'JUDGE 精确步枪',
+    'weapon.shotgun': 'BREACHER 霰弹枪',
+    'weapon.lmg': 'BASTION 轻机枪',
+    'weapon.sniper': 'SPECTRE 狙击枪',
+    'weapon.launcher': 'HAVOC 火箭筒',
+    'weapon.carbine': 'VOLT 点射卡宾枪',
+    'weapon.railgun': 'AEGIS 磁轨炮',
+    'enemy.grunt': '杂兵',
+    'enemy.ranger': '游击兵',
+    'enemy.tank': '重装兵',
+    'perk.swift': '快手', 'perk.swift.d': '换弹速度提升 20%',
+    'perk.conditioning': '体能强化', 'perk.conditioning.d': '冲刺速度提升 8%',
+    'perk.bandolier': '弹药背带', 'perk.bandolier.d': '手雷 +1，上限 +2',
+    'perk.juggernaut': '重型装甲', 'perk.juggernaut.d': '机体完整度上限 125',
+    'perk.deadeye': '神射手', 'perk.deadeye.d': '子弹伤害 +10%',
+    'streak.5': '横扫',
+    'streak.10': '猛攻',
+    'streak.15': '势不可挡',
+    'streak.20': '如有神助',
+  },
 };
 
 let current = 'en';
@@ -338,13 +498,24 @@ try {
   const stored = localStorage.getItem(LANG_KEY);
   if (stored && STRINGS[stored]) {
     current = stored;
-  } else if ((navigator.language || '').toLowerCase().startsWith('zh')) {
-    current = 'zh-TW';
+  } else {
+    const nav = (navigator.language || '').toLowerCase();
+    if (nav.startsWith('zh')) {
+      current = (nav.includes('tw') || nav.includes('hk') || nav.includes('hant'))
+        ? 'zh-TW' : 'zh-CN';
+    }
   }
 } catch (e) { /* default en */ }
 
+export const LANG_CYCLE = ['en', 'zh-TW', 'zh-CN'];
+export const LANG_LABELS = { en: 'English', 'zh-TW': '繁體中文', 'zh-CN': '简体中文' };
+
 export function getLang() {
   return current;
+}
+
+export function nextLang() {
+  return LANG_CYCLE[(LANG_CYCLE.indexOf(current) + 1) % LANG_CYCLE.length];
 }
 
 export function setLang(lang) {
@@ -374,5 +545,6 @@ export function applyDom() {
   document.querySelectorAll('[data-i18n-html]').forEach((el) => {
     el.innerHTML = t(el.dataset.i18nHtml);
   });
-  document.documentElement.lang = current === 'zh-TW' ? 'zh-Hant-TW' : 'en';
+  document.documentElement.lang =
+    current === 'zh-TW' ? 'zh-Hant-TW' : current === 'zh-CN' ? 'zh-Hans-CN' : 'en';
 }

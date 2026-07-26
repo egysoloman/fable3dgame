@@ -23,6 +23,19 @@ and fight waves together (up to 4 players). Set `PORT` to change the port;
 the server is a single Node process (static files + WebSocket room hub) and
 deploys to any Node host.
 
+### Production deployment
+
+The server is a single stateless Node process — any Node host works.
+With Docker:
+
+```sh
+docker build -t neon-strike .
+docker run -p 8080:8080 neon-strike
+```
+
+Behind a TLS proxy the client automatically uses `wss://`. Serve with
+`?nocheats=1` appended to the URL you hand out to disable the dev console.
+
 ## Solo without Node
 
 The frontend is fully static — any HTTP server works for single-player
@@ -167,11 +180,27 @@ spectate and redeploy on the next wave, and the match ends when every
 operative is down. Cheats are disabled during multiplayer matches. If the
 host disconnects mid-match the match ends and the room returns to the lobby.
 
-## Language / 語言
+## Language / 語言 / 语言
 
-The language toggle (top-right of the menus) switches between English and
-繁體中文（台灣）, persists locally, and auto-detects `zh-*` browsers on first
-visit.
+The language toggle (top-right of the menus) cycles English → 繁體中文（台灣）
+→ 简体中文, persists locally, and auto-detects `zh-*` browsers on first
+visit (Traditional for `zh-TW`/`zh-HK`, Simplified otherwise).
+
+## Versus (PvP) & vehicles online
+
+The lobby host can switch the room between **Survival** (co-op vs waves)
+and **Versus** — free-for-all PvP, first to 15 kills or best score in 4
+minutes, with 3-second respawns. Hoverbikes have their own health pool:
+they can be destroyed (ejecting and injuring the rider) and respawn at
+their pad after 20 s; in multiplayer, a ridden bike is claimed across
+clients.
+
+## Roadmap
+
+Requested and planned, in rough order: Domination/objective modes, more
+maps (space station, aircraft carrier), weapon attachments, drivable
+helicopters/tanks, AI that uses vehicles and AI teammates, Strike mode in
+multiplayer, larger rooms (>4 players), and matchmaking improvements.
 
 ## Tech notes
 
