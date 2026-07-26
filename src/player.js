@@ -43,6 +43,8 @@ export class Player {
     this.vehicle = null;
     this.armor = 0;
     this.oobTimer = 0;
+    this.mantle = null;        // active edge-climb: {t, dur, from, to}
+    this._blockedLedge = null;
 
     this.keys = new Set();
 
@@ -90,6 +92,7 @@ export class Player {
     this.timeSinceDamage = 999;
     this.shakeTime = 0;
     this.oobTimer = 0;
+    this.mantle = null;
     this.game.hud.setOob(null);
     this.keys.clear();
     this.syncCamera(0);
@@ -114,6 +117,7 @@ export class Player {
   update(dt) {
     if (!this.alive || this.vehicle) return;
     if (this.game.orbital && this.game.orbital.active) return; // aiming from orbit
+    if (this.mantle) { this._updateMantle(dt); return; }
 
     // --- input ---
     const fwd = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
@@ -170,6 +174,7 @@ export class Player {
     // --- integrate with collision, axis by axis ---
     this.wasGrounded = this.grounded;
     this.grounded = false;
+    this._blockedLedge = null;
     this._moveAxis('x', this.velocity.x * dt);
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
@@ -180,6 +185,13 @@ export class Player {
       this.position.y = 0;
       if (this.velocity.y < 0) this.velocity.y = 0;
       this.grounded = true;
+    }
+
+    // edge climbing: jump into a ledge (or hold SPACE against it) to mantle up
+    if (this._blockedLedge && fwd > 0 && !this.crouchHeld &&
+        (!this.grounded || this.keys.has('Space'))) {
+      this._tryMantle(this._blockedLedge);
+      if (this.mantle) { this.syncCamera(dt); return; }
     }
     const edge = world.map.edge || 'walls';
     if (edge === 'walls') {
@@ -257,9 +269,11 @@ export class Player {
       if (axis === 'x') {
         this.position.x = amount > 0 ? c.min.x - PLAYER_HALF_W : c.max.x + PLAYER_HALF_W;
         this.velocity.x = 0;
+        this._blockedLedge = c;
       } else if (axis === 'z') {
         this.position.z = amount > 0 ? c.min.z - PLAYER_HALF_W : c.max.z + PLAYER_HALF_W;
         this.velocity.z = 0;
+        this._blockedLedge = c;
       } else {
         if (amount > 0) {
           this.position.y = c.min.y - PLAYER_HEIGHT;
@@ -270,6 +284,51 @@ export class Player {
         this.velocity.y = 0;
       }
     }
+  }
+
+  // Edge climbing: pull up onto the ledge that just blocked horizontal
+  // movement, if it's within reach and there's room to stand on top.
+  _tryMantle(c) {
+    const rise = c.max.y - this.position.y;
+    if (rise < 0.35 || rise > 2.2) return;
+    const dir = this.forwardDir();
+    const land = new THREE.Vector3(
+      this.position.x + dir.x * (PLAYER_HALF_W * 2 + 0.35),
+      c.max.y + 0.02,
+      this.position.z + dir.z * (PLAYER_HALF_W * 2 + 0.35));
+    if (land.x < c.min.x - 0.05 || land.x > c.max.x + 0.05 ||
+        land.z < c.min.z - 0.05 || land.z > c.max.z + 0.05) return;
+    const b = this._aabb(land);
+    for (const o of this.game.world.colliders) {
+      if (o === c) continue;
+      if (b.maxX > o.min.x && b.minX < o.max.x &&
+          b.maxY > o.min.y + 0.01 && b.minY < o.max.y - 0.01 &&
+          b.maxZ > o.min.z && b.minZ < o.max.z) return;
+    }
+    this.mantle = { t: 0, dur: 0.3 + rise * 0.12, from: this.position.clone(), to: land };
+    this.velocity.set(0, 0, 0);
+    this.crouchToggle = false;
+    this.game.audio.jump();
+  }
+
+  _updateMantle(dt) {
+    const m = this.mantle;
+    m.t += dt;
+    const k = Math.min(1, m.t / m.dur);
+    const ease = (v) => v * v * (3 - 2 * v);
+    const rise = ease(Math.min(1, k * 1.5));          // pull up first...
+    const slide = ease(Math.max(0, (k - 0.25) / 0.75)); // ...then over the lip
+    this.position.y = m.from.y + (m.to.y - m.from.y) * rise;
+    this.position.x = m.from.x + (m.to.x - m.from.x) * slide;
+    this.position.z = m.from.z + (m.to.z - m.from.z) * slide;
+    if (k >= 1) {
+      this.mantle = null;
+      this.grounded = true;
+      this.wasGrounded = true;
+      this.landBump = 0.1;
+      this.game.audio.land();
+    }
+    this.syncCamera(dt);
   }
 
   addShake(mag) {

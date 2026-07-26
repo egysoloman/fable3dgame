@@ -112,6 +112,12 @@ export class BotPlayer {
     this.meleeOnly = false;   // infection mode: claws, no guns
     this.speedMul = 1;
 
+    // wall-unstuck state: progress watchdog + committed detour direction
+    this.stuckTimer = 0;
+    this.avoidTimer = 0;
+    this.avoidDir = new THREE.Vector3();
+    this._blockedTop = null;
+
     const body = buildEnemyBody({ color, eyeColor: 0xffe0b0 }, true);
     this.parts = body;
     this.group = body.group;
@@ -590,11 +596,19 @@ export class BotPlayer {
       g.rotation.y = Math.atan2(toT.x, toT.z);
     }
 
+    // unstuck detour: while committed, wall-slide instead of pushing the
+    // wall between us and the destination (the opposite-sides deadlock)
+    if (this.avoidTimer > 0) {
+      this.avoidTimer -= dt;
+      if (move.lengthSq() > 0.001) move.copy(this.avoidDir);
+    }
+
     const speed = 5.2 * this.diff.speed * this.speedMul;
     this.velocity.x = move.x * speed;
     this.velocity.z = move.z * speed;
     this.velocity.y -= GRAVITY * (this.game.world.map.gravityMul || 1) * dt;
     const px0 = this.position.x, pz0 = this.position.z;
+    this._blockedTop = null;
     this._moveAxis('x', this.velocity.x * dt);
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
@@ -608,6 +622,41 @@ export class BotPlayer {
       this.position.z = pz0;
     }
     g.position.copy(this.position);
+
+    // progress watchdog: wanted to move but barely did → we're pressed
+    // into geometry. Hop over low cover (bot edge climbing), otherwise
+    // probe both wall-slide directions and commit to the open one.
+    const wanted = speed * dt;
+    const got = Math.hypot(this.position.x - px0, this.position.z - pz0);
+    if (move.lengthSq() > 0.01 && wanted > 1e-4 && got < wanted * 0.25) {
+      this.stuckTimer += dt;
+      if (this.stuckTimer > 0.45) {
+        this.stuckTimer = 0;
+        if (this._blockedTop !== null && this.velocity.y === 0 &&
+            this._blockedTop - this.position.y <= 1.35) {
+          this.velocity.y = 9;
+        } else {
+          const perp = new THREE.Vector3(-move.z, 0, move.x);
+          const from = new THREE.Vector3(
+            this.position.x, this.position.y + 1.2, this.position.z);
+          _ray.set(from, perp);
+          _ray.far = 4;
+          const lBlock = _ray.intersectObjects(
+            this.game.world.colliderMeshes, false).length > 0;
+          _ray.set(from, perp.clone().negate());
+          _ray.far = 4;
+          const rBlock = _ray.intersectObjects(
+            this.game.world.colliderMeshes, false).length > 0;
+          const sign = lBlock === rBlock ? this.flankSign : (lBlock ? -1 : 1);
+          this.flankSign = -sign;   // alternate if this detour jams too
+          this.avoidDir.copy(perp).multiplyScalar(sign)
+            .addScaledVector(move, -0.2).normalize();
+          this.avoidTimer = 1.3;
+        }
+      }
+    } else if (got > wanted * 0.6) {
+      this.stuckTimer = 0;
+    }
 
     // weapon handling: real magazines, reloads, burst discipline
     if (this.meleeOnly) {
@@ -696,9 +745,11 @@ export class BotPlayer {
       if (axis === 'x') {
         this.position.x = amount > 0 ? c.min.x - this.halfW : c.max.x + this.halfW;
         this.velocity.x = 0;
+        this._blockedTop = Math.max(this._blockedTop ?? -Infinity, c.max.y);
       } else if (axis === 'z') {
         this.position.z = amount > 0 ? c.min.z - this.halfW : c.max.z + this.halfW;
         this.velocity.z = 0;
+        this._blockedTop = Math.max(this._blockedTop ?? -Infinity, c.max.y);
       } else {
         this.position.y = amount > 0 ? c.min.y - this.height : c.max.y;
         this.velocity.y = 0;

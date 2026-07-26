@@ -65,6 +65,8 @@ class SoldierBot {
     this.coverSpot = null;
     this.walkPhase = Math.random() * 10;
     this.flashTime = 0;
+    this.stuckTimer = 0;
+    this.avoidTimer = 0;
 
     const body = buildEnemyBody(BOT_TYPE, true);
     this.parts = body;
@@ -286,6 +288,13 @@ class SoldierBot {
         move.z += (dz / d) * (1 - d / 2) * 1.4;
       }
     }
+
+    // unstuck: a wall between us and the goal kills all progress — commit
+    // to a sidestep along it instead of pushing the face forever
+    if (this.avoidTimer > 0) {
+      this.avoidTimer -= dt;
+      move.addScaledVector(perp, 1.6);
+    }
     if (move.lengthSq() > 0.001) move.normalize();
 
     const speed = this.state === 'engage' ? 4.2 : 5.4;
@@ -303,6 +312,20 @@ class SoldierBot {
     if (!this.game.world.groundAt(this.position.x, this.position.z)) {
       this.position.x = px0;
       this.position.z = pz0;
+    }
+
+    // progress watchdog → trigger the sidestep, alternating direction
+    const wantedD = speed * dt;
+    const gotD = Math.hypot(this.position.x - px0, this.position.z - pz0);
+    if (move.lengthSq() > 0.01 && wantedD > 1e-4 && gotD < wantedD * 0.25) {
+      this.stuckTimer += dt;
+      if (this.stuckTimer > 0.4) {
+        this.stuckTimer = 0;
+        this.strafeSign *= -1;
+        this.avoidTimer = 1.1;
+      }
+    } else if (gotD > wantedD * 0.6) {
+      this.stuckTimer = 0;
     }
 
     // --- weapon handling ---

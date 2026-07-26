@@ -146,6 +146,13 @@ Mechanics:
   and fires while the other pushes.
 - **Flash & smoke aware** — flashbangs stun AI for 3 s (with LOS), and
   smoke spheres block every AI perception raycast.
+- **Wall-unstuck (all tiers)** — a progress watchdog compares distance
+  actually covered against distance wanted each frame. When a bot pushes
+  geometry without moving (the classic two-bots-on-opposite-sides-of-a-wall
+  deadlock), it either hops blockers up to 1.35 m tall or raycasts both
+  wall-slide directions and commits ~1.3 s to the open one, alternating
+  sides on repeated jams. Strike soldiers run the same watchdog with an
+  alternating sidestep.
 
 ## 8. Grenades
 

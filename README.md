@@ -70,7 +70,7 @@ python3 -m http.server 8080
 | `G` | Throw frag grenade |
 | `Shift` | Sprint |
 | `C` (toggle) / `Ctrl` (hold) | Crouch |
-| `Space` | Jump (crates are climbable) |
+| `Space` | Jump — jump into a ledge (or hold against it) to climb up |
 | `1`–`8` or wheel | Switch weapon |
 | `R` | Reload |
 | `V` | Quick melee |
