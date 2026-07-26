@@ -13,6 +13,7 @@ import { CheatSystem } from './cheats.js';
 import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
 import { DominationManager } from './domination.js';
+import { TdmManager } from './tdm.js';
 import { BotMatch, DIFFICULTY } from './bots.js';
 import { Warfare, OrbitalRailgun, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
@@ -44,17 +45,20 @@ class Game {
     this.menuTime = 0;
     this.mpOverlay = false;
 
-    this.settings = { sensitivity: 1, volume: 0.7 };
+    this.settings = { sensitivity: 1, volume: 0.7, quality: 'high' };
     try {
       Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'));
     } catch (e) { /* defaults */ }
+    if (!['low', 'medium', 'high'].includes(this.settings.quality)) {
+      this.settings.quality = 'high';
+    }
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(this.renderer.domElement);
+    this.applyQuality();
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
@@ -81,6 +85,7 @@ class Game {
     this.mp = new Multiplayer(this);
     this.soldiers = new SoldierManager(this);
     this.domination = new DominationManager(this);
+    this.tdm = new TdmManager(this);
     this.botMatch = new BotMatch(this);
     this.warfare = new Warfare(this);
     this.orbital = new OrbitalRailgun(this);
@@ -94,6 +99,7 @@ class Game {
       if (DIFFICULTY[st.difficulty]) this.setup.difficulty = st.difficulty;
     } catch (e) { /* defaults */ }
     this.matchDifficulty = 'normal';
+    this.applyQuality(); // again now that the world (and its sun) exists
     this.ui = this._buildUi();
 
     this.weapons.rig.visible = false;
@@ -370,10 +376,10 @@ class Game {
         for (const d of Object.keys(DIFFICULTY)) {
           $(`diff-${d}`).classList.toggle('sel', game.setup.difficulty === d);
         }
-        for (const m of ['survival', 'strike', 'domination', 'versus']) {
+        for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
-        for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop']) {
+        for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory']) {
           $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
         }
         $('setup-loadout-sum').textContent = ui.loadoutSummary();
@@ -576,7 +582,7 @@ class Game {
       setLang(nextLang());
       ui.refreshText();
     });
-    for (const m of ['survival', 'strike', 'domination', 'versus']) {
+    for (const m of ['survival', 'strike', 'domination', 'tdm', 'versus']) {
       $(`mode-${m}`).addEventListener('click', () => { game.setup.mode = m; ui.saveSetup(); });
     }
     for (const d of Object.keys(DIFFICULTY)) {
@@ -591,7 +597,7 @@ class Game {
       ui.saveSetup();
       $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
     });
-    for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop']) {
+    for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
     }
     for (const slot of Object.keys(ATTACHMENTS)) {
@@ -616,7 +622,7 @@ class Game {
     }
     $('lobby-map-btn').addEventListener('click', () => {
       // host cycles the co-op map
-      const cycle = ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop'];
+      const cycle = ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop', 'snow', 'factory'];
       game.setup.map = cycle[(cycle.indexOf(game.setup.map) + 1) % cycle.length];
       ui.saveSetup();
       $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
@@ -627,6 +633,16 @@ class Game {
     });
 
     return ui;
+  }
+
+  // Graphics quality: low = reduced resolution + no shadows,
+  // medium = native resolution + shadows, high = supersampled up to 2x DPR.
+  applyQuality() {
+    const q = this.settings.quality;
+    this.renderer.setPixelRatio(
+      q === 'low' ? 0.66 : q === 'medium' ? 1 : Math.min(window.devicePixelRatio, 2));
+    if (this.world && this.world.sun) this.world.sun.castShadow = q !== 'low';
+    this.renderer.shadowMap.enabled = q !== 'low';
   }
 
   _wireSettings() {
@@ -648,6 +664,17 @@ class Game {
       volVal.textContent = this.settings.volume.toFixed(2);
       this.applyVolume();
       this.saveSettings();
+    });
+    const qBtn = document.getElementById('quality-btn');
+    const qLabel = () => { qBtn.textContent = t(`gfx.${this.settings.quality}`); };
+    qLabel();
+    qBtn.addEventListener('click', () => {
+      const order = ['low', 'medium', 'high'];
+      this.settings.quality =
+        order[(order.indexOf(this.settings.quality) + 1) % order.length];
+      this.applyQuality();
+      this.saveSettings();
+      qLabel();
     });
   }
 
@@ -759,6 +786,7 @@ class Game {
     this.matchDifficulty = this.setup.difficulty;
     this.enemies = this.mode === 'strike' ? this.soldiers
       : this.mode === 'domination' ? this.domination
+      : this.mode === 'tdm' ? this.tdm
       : this.mode === 'versus' ? this.botMatch : this.enemiesSolo;
     for (const mgr of [this.enemiesSolo, this.soldiers, this.domination, this.botMatch]) {
       if (mgr !== this.enemies) mgr.reset();
@@ -807,6 +835,13 @@ class Game {
   }
 
   domFinished(win) {
+    document.querySelector('#gameover-screen h1').textContent =
+      t(win ? 'strike.win' : 'strike.lose');
+    this.hud.subbanner('');
+    this._finishRun();
+  }
+
+  tdmFinished(win) {
     document.querySelector('#gameover-screen h1').textContent =
       t(win ? 'strike.win' : 'strike.lose');
     this.hud.subbanner('');
@@ -947,7 +982,7 @@ class Game {
       this.enemies.onPlayerDeath();
       return;
     }
-    if ((this.mode === 'versus' || this.mode === 'domination') &&
+    if ((this.mode === 'versus' || this.mode === 'domination' || this.mode === 'tdm') &&
         !this.mp.active && !this.enemies.done) {
       // bot-team modes: credit the killer bot, then redeploy
       if (this.player.lastBotAttacker && this.enemies.creditPlayerDeath) {

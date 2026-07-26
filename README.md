@@ -73,18 +73,21 @@ python3 -m http.server 8080
 | `Space` | Jump (crates are climbable) |
 | `1`–`8` or wheel | Switch weapon |
 | `R` | Reload |
-| `Esc` | Pause (sensitivity & volume settings) |
+| `Esc` | Pause (sensitivity, volume & graphics quality settings) |
 | `~` / `F1` | Dev console (cheats) |
 
 ## Modes, maps & loadout
 
 Clicking **SOLO** opens mission setup:
 
-- **Modes** — **Survival** (endless robot waves, also the co-op mode) and
-  **Squad Strike**: 30 eliminations in 5 minutes against respawning AI
-  soldiers who fight with the real weapon arsenal — burst discipline,
-  tightening aim, cover use and reloads. The full AI algorithm is
-  documented in [docs/AI.md](docs/AI.md).
+- **Modes** — **Survival** (endless robot waves, also the co-op mode),
+  **Squad Strike** (30 eliminations in 5 minutes against respawning AI
+  soldiers), **Domination** (bot teams contest three zones),
+  **Team Deathmatch** (your fireteam — you plus two ally bots — against
+  an enemy squad; every elimination scores, first to 30 or the higher
+  score at five minutes), and **Versus** (free-for-all, online PvP or
+  offline against bot players). The full AI algorithm is documented in
+  [docs/AI.md](docs/AI.md).
 - **Maps** — the compact **Neon Arena**, the large dusk **Sector K
   Battlefield** (bunkers, sandbag lines, watchtowers, a central hill),
   the low-gravity **Helios Station**, the naval **CVN Tempest Carrier**,
@@ -93,8 +96,14 @@ Clicking **SOLO** opens mission setup:
   night with a walkable penthouse roof deck over glass-walled rooms,
   antenna masts, a helipad, crate stairs between layers, and a
   surrounding city of **real low-poly tower models** with lit windows
-  rising out of the cloud sea. Every outdoor map wraps a procedural
-  360° panoramic skybox — starfield, Earth and nebulae over the
+  rising out of the cloud sea. Two more arenas round out the rotation:
+  **Frostline Base**, an open tundra listening post in a blizzard —
+  visibility drops to ~20 m, sniper towers pierce the fog, and leaving
+  the area of operations starts the out-of-bounds countdown — and
+  **Rustworks Factory**, an enclosed industrial yard with two pillared
+  production halls whose roofs are walkable catwalks, machinery cover,
+  conveyor lines, smoke stacks, and a container maze. Every outdoor map
+  wraps a procedural 360° panoramic skybox — starfield, Earth and nebulae over the
   station, ocean, cumulus and sun around the carrier, hazy noon sky
   over the desert, a burning dusk over the battlefield, and a starry
   night above the rooftop — painted onto canvas at load, no texture
@@ -265,8 +274,10 @@ cover-seeking retreats below 35% HP and peek-firing around lost
 contacts, and expert runs the full suite — persistent flanking arcs,
 suppression fire over last-known positions, and coordinated
 advance/overwatch team roles. Flashbangs stun AI and smoke blocks every
-AI sight line. The full algorithm is documented in
-[docs/AI.md](docs/AI.md). **Versus** is now
+AI sight line. Bots also **use vehicles**: from normal difficulty up,
+a bot with a distant objective will commandeer a free hoverbike, ride
+it into the fight (watch for drive-by rams), and hop off close-in.
+The full algorithm is documented in [docs/AI.md](docs/AI.md). **Versus** is now
 also playable solo: three bot players with real weapons, armor, regen,
 respawns, and scoreboard entries fill the FFA — first to 15 kills.
 **Domination** is a true team fight: a 3-bot enemy squad pushes,
@@ -277,8 +288,12 @@ cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: bot fill in online rooms, an expanded killstreak ladder (UAV,
-airstrike, care package), and skill-based matchmaking with parties.
+Next up: more weapons (heavy sniper, energy rifle, melee, molotov),
+bot fill in online rooms, an expanded killstreak ladder (UAV, airstrike,
+care package), more modes (CTF, Search & Destroy, Infection), and
+skill-based matchmaking with parties. The pause menu's **graphics
+quality** setting (LOW / MEDIUM / HIGH) trades resolution and shadows
+for frame rate on low-end devices.
 
 ## Tech notes
 

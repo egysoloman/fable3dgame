@@ -205,6 +205,7 @@ class Vehicle {
     }
     this.remoteOccupied = false;
     this.remoteDriven = false;
+    this.botRider = null;
     if (this.game.mp.active && !fromRemote) this.game.mp.sendVehKill(this.index);
   }
 
@@ -895,7 +896,7 @@ export class Warfare {
     }
     if (!p.alive) return;
     for (const v of this.vehicles) {
-      if (v.destroyed || v.remoteOccupied) continue;
+      if (v.destroyed || v.remoteOccupied || v.botRider) continue;
       const d = Math.hypot(v.position.x - p.position.x, v.position.z - p.position.z);
       if (d < v.mountRadius) {
         p.vehicle = v;
@@ -931,6 +932,7 @@ export class Warfare {
     // mount hint
     if (!p.vehicle && p.alive) {
       const near = this.vehicles.some((v) => !v.destroyed && !v.remoteOccupied &&
+        !v.botRider &&
         Math.hypot(v.position.x - p.position.x, v.position.z - p.position.z) < v.mountRadius);
       this.game.hud.setMountHint(near);
     } else {

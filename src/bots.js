@@ -107,6 +107,8 @@ export class BotPlayer {
     this.coverTimer = 0;
     this.coverDir = new THREE.Vector3();
     this.suppressTimer = 0;
+    this.vehicle = null;
+    this.vehicleTimer = 5 + Math.random() * 5;
 
     const body = buildEnemyBody({ color, eyeColor: 0xffe0b0 }, true);
     this.parts = body;
@@ -178,6 +180,56 @@ export class BotPlayer {
     _ray.set(from.clone(), dir);
     _ray.far = dist;
     return _ray.intersectObjects(this.game.world.colliderMeshes, false).length === 0;
+  }
+
+  // Drive the claimed hoverbike toward the current destination. Returns
+  // true while riding (the on-foot movement/combat path is skipped).
+  _rideVehicle(dt, g) {
+    const v = this.vehicle;
+    if (v.destroyed) { this._dismountVehicle(); return false; }
+    const dest = this.target ? this.target.position : this.objective;
+    if (!dest) { this._dismountVehicle(); return false; }
+    const dx = dest.x - this.position.x, dz = dest.z - this.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 12) { this._dismountVehicle(); return false; }
+    const wantYaw = Math.atan2(-dx, -dz);
+    let dy = wantYaw - v.yaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    v.yaw += Math.max(-1.8 * dt, Math.min(1.8 * dt, dy));
+    v.speed = Math.min(14, v.speed + 10 * dt);
+    const px0 = v.position.x, pz0 = v.position.z;
+    v._moveAxis('x', -Math.sin(v.yaw) * v.speed * dt);
+    v._moveAxis('z', -Math.cos(v.yaw) * v.speed * dt);
+    const lim = this.game.world.half - 1;
+    v.position.x = Math.max(-lim, Math.min(lim, v.position.x));
+    v.position.z = Math.max(-lim, Math.min(lim, v.position.z));
+    if (!this.game.world.groundAt(v.position.x, v.position.z)) {
+      v.position.x = px0;
+      v.position.z = pz0;
+      v.speed *= 0.3;
+    }
+    // drive-by ram on the player
+    const p = this.game.player;
+    if (p.alive && v.speed > 8 && this.team !== 'allies' &&
+        Math.hypot(p.position.x - v.position.x, p.position.z - v.position.z) < 1.6) {
+      p.lastBotAttacker = this.id;
+      p.takeDamage(40, v.position, 'melee');
+      v.speed *= 0.5;
+    }
+    this.position.set(v.position.x, v.position.y + 0.55, v.position.z);
+    g.position.copy(this.position);
+    g.rotation.y = v.yaw;
+    v._sync(dt);
+    this._visuals(dt, false, 0);
+    return true;
+  }
+
+  _dismountVehicle() {
+    if (!this.vehicle) return;
+    this.vehicle.botRider = null;
+    this.vehicle.speed = 0;
+    this.vehicle = null;
   }
 
   // Retreat helper: probe left/back/right and steer down the first path
@@ -381,6 +433,32 @@ export class BotPlayer {
       }
     }
 
+    // ---- AI vehicle usage: commandeer a free hoverbike for long transits
+    // (normal difficulty and up), ride toward the fight, hop off close-in
+    if (this.vehicle) {
+      if (this._rideVehicle(dt, g)) return true;
+    } else if (tac.cover) {
+      this.vehicleTimer -= dt;
+      if (this.vehicleTimer <= 0) {
+        this.vehicleTimer = 3 + Math.random() * 4;
+        const dest = this.target ? this.target.position : this.objective;
+        const far = dest &&
+          Math.hypot(dest.x - this.position.x, dest.z - this.position.z) > 30;
+        if (far) {
+          for (const v of this.game.warfare.vehicles) {
+            if (v.type !== 'bike' || v.destroyed || v.mounted ||
+                v.remoteOccupied || v.botRider) continue;
+            if (Math.hypot(v.position.x - this.position.x,
+                v.position.z - this.position.z) < 6) {
+              this.vehicle = v;
+              v.botRider = this;
+              break;
+            }
+          }
+        }
+      }
+    }
+
     // movement: keep preferred range, strafe
     this.strafeFlip -= dt;
     if (this.strafeFlip <= 0) {
@@ -500,8 +578,11 @@ export class BotPlayer {
       }
     }
 
-    // animation + bars
-    const moving = move.lengthSq() > 0.01;
+    this._visuals(dt, move.lengthSq() > 0.01, speed);
+    return true;
+  }
+
+  _visuals(dt, moving, speed) {
     if (moving) this.walkPhase += dt * speed * 2.2;
     const swing = moving ? Math.sin(this.walkPhase) * 0.5 : 0;
     this.parts.legL.rotation.x = swing;
@@ -521,7 +602,6 @@ export class BotPlayer {
     const show = this.hp < this.maxHp;
     this.parts.bar.visible = show;
     this.parts.barBg.visible = show;
-    return true;
   }
 
   _moveAxis(axis, amount) {
@@ -572,6 +652,7 @@ export class BotPlayer {
   }
 
   die(attackerId) {
+    this._dismountVehicle();
     this.alive = false;
     this.dying = 0;
     this.streak = 0;
@@ -585,6 +666,7 @@ export class BotPlayer {
   }
 
   dispose() {
+    this._dismountVehicle();
     this.game.scene.remove(this.group);
     this.parts.dispose();
     this.tag.material.map.dispose();

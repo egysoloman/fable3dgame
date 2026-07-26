@@ -259,6 +259,22 @@ const SKY_PAINTERS = {
     paintClouds(g, w, [h * 0.54, h * 0.66], 18, rand, 0.35);
   },
 
+  // snowfield overcast: flat white sky, milky sun, drifting flurries
+  snow(g, w, h) {
+    const rand = mulberry32(5151);
+    skyGradient(g, w, h, [
+      [0, '#aebcca'], [0.3, '#c2ccd6'], [0.5, '#dae2ea'],
+      [0.55, '#c8d2da'], [1, '#aab4be'],
+    ]);
+    paintSun(g, w * 0.4, h * 0.22, 20, 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.3)');
+    paintClouds(g, w, [h * 0.1, h * 0.4], 20, rand, 0.5);
+    // wind-blown snow streaks
+    g.fillStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < 260; i++) {
+      g.fillRect(rand() * w, rand() * h * 0.6, 1 + rand() * 2, 1);
+    }
+  },
+
   // battlefield dusk: burning gradient, low sun, streak clouds
   dusk(g, w, h) {
     const rand = mulberry32(2222);
@@ -587,6 +603,115 @@ export const MAPS = {
         w.addBox(x, h2 / 2, z, s2, h2, s2, rand() < 0.5 ? w.mats.ruin : w.mats.rock);
       }
       w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
+    },
+  },
+
+  snow: {
+    id: 'snow',
+    size: 130,
+    sky: 'snow',
+    edge: 'oob',         // open tundra: leaving the AO starts the countdown
+    fog: [0xd8e2ea, 18, 85],   // blizzard: very low visibility
+    bg: 0xd8e2ea,
+    hemi: [0xe8f0f8, 0x8a97a8, 1.3],
+    sun: [0xe8f0ff, 1.05],
+    floorColors: ['#c8d2da', '#dae4ec', '#f0f6fa'],
+    accents: [
+      [-40, 0x9fd8ff, -40], [40, 0x9fd8ff, 40], [0, 0xd0e8ff, 0],
+    ],
+    playerSpawn: [0, 52],
+    domPoints: [[-26, -10], [26, 6], [0, -38]],
+    vehicles: [[-7, 46, 0.4], [7, 46, -0.4], [-16, 40, 0, 'tank'], [16, 40, 3.14, 'heli']],
+    build(w) {
+      const rand = mulberry32(1212);
+      // central listening post: walled compound with a roofed core
+      w.addBox(0, 1.6, -4, 14, 3.2, 1, w.mats.bunker);
+      w.addBox(-7, 1.6, 2, 1, 3.2, 12, w.mats.bunker);
+      w.addBox(7, 1.6, 2, 1, 3.2, 12, w.mats.bunker);
+      w.addBox(0, 3.6, 2, 15, 0.5, 13, w.mats.bunker);   // roof slab
+      w.addTrim(0, 3.95, 2, 15.2, 0.15, 13.2);
+      // radar dome on the roof
+      w.addBox(0, 4.9, 2, 3, 2.2, 3, w.mats.pillar);
+      // roof access stairs
+      w.addBox(11, 0.6, 8, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(9.5, 1.8, 10.5, 2.4, 1.2, 2.4, w.mats.crate);
+      w.addBox(8, 2.9, 8, 2.4, 1.2, 2.4, w.mats.crate);
+      // sniper towers piercing the blizzard on both flanks
+      for (const [tx, tz] of [[-38, -18], [38, 14]]) {
+        w.addBox(tx, 3.2, tz, 3.2, 6.4, 3.2, w.mats.pillar);
+        w.addTrim(tx, 6.6, tz, 3.5, 0.2, 3.5);
+        w.addBox(tx + 3, 0.75, tz, 2, 1.5, 2, w.mats.crate);
+        w.addBox(tx + 3, 2.1, tz + 2.6, 2, 4.2, 2, w.mats.crate);
+        w.addBox(tx + 0.5, 5.4, tz + 2.9, 2, 1.2, 2, w.mats.crate);
+      }
+      // supply containers + drift-buried crates
+      for (let i = 0; i < 3; i++) {
+        w.addBox(-34 + i * 7, 1.5, 30, 6, 3, 2.6, w.mats.container);
+        w.addBox(30 + i * 6, 1.4, -34, 5, 2.8, 2.4, w.mats.container);
+      }
+      // ice boulders / snow drifts as scattered cover
+      for (let i = 0; i < 20; i++) {
+        const x = (rand() - 0.5) * (this.size - 16);
+        const z = (rand() - 0.5) * (this.size - 16);
+        if (Math.hypot(x, z) < 12) continue;
+        if (Math.hypot(x - this.playerSpawn[0], z - this.playerSpawn[1]) < 11) continue;
+        if (this.vehicles.some(([vx, vz]) => Math.hypot(x - vx, z - vz) < 6)) continue;
+        const s = 1.3 + rand() * 2.2;
+        const h = 0.7 + rand() * 1.5;
+        w.addBox(x, h / 2, z, s, h, s * (0.7 + rand() * 0.6),
+          rand() < 0.5 ? w.mats.pillar : w.mats.crate);
+      }
+      w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
+    },
+  },
+
+  factory: {
+    id: 'factory',
+    size: 90,
+    fog: [0x1a1812, 22, 105],
+    bg: 0x14120c,
+    hemi: [0x8a7a5a, 0x0c0a08, 0.95],
+    sun: [0xffd8a0, 1.0],
+    floorColors: ['#2a2620', '#3a352c', '#6a5f4a'],
+    accents: [
+      [-30, 0xffb347, -30], [30, 0xff6a3b, 30], [-30, 0xffcf3b, 30], [30, 0xffb347, -30],
+    ],
+    playerSpawn: [0, 38],
+    domPoints: [[-24, -12], [24, 4], [0, -30]],
+    vehicles: [[-8, 32, 0.4], [8, 32, -0.4]],
+    build(w) {
+      const rand = mulberry32(3434);
+      // two production halls: pillared roofs with walkable catwalk slabs
+      for (const hx of [-20, 18]) {
+        w.addBox(hx, 4.4, -8, 22, 0.6, 20, w.mats.bunker);  // roof/catwalk
+        w.addTrim(hx, 4.85, -8, 22.2, 0.15, 20.2);
+        for (const [px, pz] of [[hx - 9, -16], [hx + 9, -16], [hx - 9, 0], [hx + 9, 0]]) {
+          w.addBox(px, 2.05, pz, 1.2, 4.1, 1.2, w.mats.pillar);
+        }
+        // machinery blocks under the roof
+        w.addBox(hx - 4, 1.3, -12, 4, 2.6, 3, w.mats.container);
+        w.addBox(hx + 4, 1.0, -4, 3.4, 2, 3, w.mats.container);
+        // catwalk stairs
+        w.addBox(hx - 12.6, 0.75, 0.5, 2.2, 1.5, 2.2, w.mats.crate);
+        w.addBox(hx - 12.6, 2.1, 3.2, 2.2, 4.2, 2.2, w.mats.crate);
+      }
+      // conveyor line across the middle
+      w.addBox(0, 0.7, 12, 34, 1.4, 2.2, w.mats.sandbag);
+      w.addBox(0, 0.7, 20, 26, 1.4, 2.2, w.mats.sandbag);
+      // smoke stacks
+      for (const [sx, sz] of [[-34, -30], [34, -32]]) {
+        w.addBox(sx, 5, sz, 2.6, 10, 2.6, w.mats.pillar);
+        w.addTrim(sx, 10.2, sz, 2.9, 0.2, 2.9);
+      }
+      // container maze in the yard
+      for (let i = 0; i < 12; i++) {
+        const x = (rand() - 0.5) * (this.size - 14);
+        const z = 22 + (rand() - 0.5) * 24;
+        if (Math.hypot(x - this.playerSpawn[0], z - this.playerSpawn[1]) < 9) continue;
+        if (this.vehicles.some(([vx, vz]) => Math.hypot(x - vx, z - vz) < 5)) continue;
+        w.addBox(x, 1.4, Math.min(40, z), 4.5, 2.8, 2.2, w.mats.container);
+      }
+      w.spawnPoints = w.ringSpawns(10, this.size / 2 - 5);
     },
   },
 
