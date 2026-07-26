@@ -260,6 +260,91 @@
   #killfeed div.cheat {
     border-right-color: var(--warn); color: #ffe9a8;
   }
+
+  /* ---------- language toggle ---------- */
+  #lang-btn {
+    position: fixed; top: 16px; right: 20px; z-index: 30;
+    pointer-events: auto; cursor: pointer;
+    font-family: inherit; font-size: 13px; letter-spacing: 2px;
+    color: var(--neon); background: rgba(5, 12, 20, 0.7);
+    border: 1px solid rgba(39, 232, 255, 0.4); border-radius: 3px;
+    padding: 6px 14px; display: none;
+  }
+  #lang-btn.visible { display: block; }
+  #lang-btn:hover { background: rgba(39, 232, 255, 0.15); }
+
+  /* ---------- multiplayer screens ---------- */
+  .btn.secondary {
+    background: transparent; color: var(--neon);
+    border: 1px solid rgba(39, 232, 255, 0.5);
+    box-shadow: none;
+  }
+  .btn.secondary:hover { background: rgba(39, 232, 255, 0.12); box-shadow: none; }
+  .btn-row { display: flex; gap: 16px; margin-top: 4px; }
+  .mp-form {
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+    margin-bottom: 8px;
+  }
+  .mp-form .row { display: flex; gap: 10px; align-items: center; }
+  .mp-form label { font-size: 12px; letter-spacing: 2px; color: var(--neon-dim); }
+  .mp-form input {
+    pointer-events: auto; font-family: inherit; font-size: 16px; letter-spacing: 2px;
+    color: #d7faff; background: rgba(5, 12, 20, 0.7);
+    border: 1px solid rgba(39, 232, 255, 0.4); border-radius: 3px;
+    padding: 8px 12px; width: 200px; text-transform: uppercase;
+  }
+  .mp-form input:focus { outline: none; border-color: var(--neon); }
+  #room-code-input { width: 110px; text-align: center; }
+  #room-list {
+    width: 420px; max-height: 240px; overflow-y: auto;
+    border: 1px solid rgba(39, 232, 255, 0.25); border-radius: 4px;
+    margin-top: 8px; text-align: left;
+  }
+  #room-list .room-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px; font-size: 14px; letter-spacing: 1px;
+    border-bottom: 1px solid rgba(39, 232, 255, 0.12);
+  }
+  #room-list .room-row b { color: var(--neon); }
+  #room-list .room-row .grow { flex: 1; color: #8fd8e6; }
+  #room-list .empty { padding: 16px; color: #6fb7c4; font-size: 13px; text-align: center; }
+  .join-btn {
+    pointer-events: auto; cursor: pointer; font-family: inherit;
+    font-size: 12px; letter-spacing: 2px; color: #05121a;
+    background: var(--neon); border: none; border-radius: 3px; padding: 5px 14px;
+  }
+  #mp-status { min-height: 20px; margin-top: 14px; font-size: 13px; color: var(--warn); letter-spacing: 1px; }
+  #lobby-players {
+    width: 380px; margin: 10px 0 22px; text-align: left;
+    border: 1px solid rgba(39, 232, 255, 0.25); border-radius: 4px;
+  }
+  #lobby-players .p-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; font-size: 15px; letter-spacing: 1px;
+    border-bottom: 1px solid rgba(39, 232, 255, 0.12);
+  }
+  #lobby-players .p-row .grow { flex: 1; }
+  #lobby-players .tag { font-size: 11px; padding: 2px 8px; border-radius: 3px; letter-spacing: 2px; }
+  #lobby-players .tag.host { color: var(--warn); border: 1px solid rgba(255, 207, 59, 0.5); }
+  #lobby-players .tag.ready { color: #4dff88; border: 1px solid rgba(77, 255, 136, 0.5); }
+  #lobby-players .tag.notready { color: #6fb7c4; border: 1px solid rgba(110, 183, 196, 0.4); }
+  #lobby-code { font-size: 30px; letter-spacing: 10px; color: var(--warn); margin-bottom: 4px; }
+  #spectate-note {
+    position: absolute; left: 50%; top: 60%; transform: translateX(-50%);
+    font-size: 20px; letter-spacing: 4px; color: var(--danger);
+    text-shadow: 0 0 14px var(--danger); white-space: nowrap;
+    display: none;
+  }
+  #spectate-note.visible { display: block; }
+  #mp-scores {
+    margin-bottom: 26px; min-width: 380px;
+  }
+  #mp-scores .s-row {
+    display: flex; gap: 14px; padding: 8px 18px; font-size: 17px; letter-spacing: 1px;
+    border-bottom: 1px solid rgba(39, 232, 255, 0.15);
+  }
+  #mp-scores .s-row .grow { flex: 1; text-align: left; }
+  #mp-scores .s-row b { color: var(--neon); }
 </style>
 </head>
 <body>
@@ -273,7 +358,7 @@
   <div id="scope"><div class="mask"></div><div class="lineh"></div><div class="linev"></div></div>
 
   <div class="panel" id="health-panel">
-    <div id="health-label">INTEGRITY</div>
+    <div id="health-label" data-i18n="hud.integrity"></div>
     <div id="health-value">100</div>
     <div id="health-bar-track"><div id="health-bar"></div></div>
   </div>
@@ -283,13 +368,13 @@
     <div id="ammo-value">&infin;</div>
     <div id="ammo-reserve"></div>
     <div id="grenade-row"></div>
-    <div id="reload-hint">[R] RELOAD</div>
+    <div id="reload-hint" data-i18n="hud.reload"></div>
   </div>
 
   <div class="panel" id="score-panel">
-    <div id="score-label">SCORE</div>
+    <div id="score-label" data-i18n="hud.score"></div>
     <div id="score-value">0</div>
-    <div id="wave-label">WAVE</div>
+    <div id="wave-label" data-i18n="hud.wave"></div>
     <div id="wave-value">1</div>
     <div id="enemies-left"></div>
     <div id="streak-value"></div>
@@ -303,45 +388,94 @@
 
   <div id="banner"></div>
   <div id="subbanner"></div>
+  <div id="spectate-note" data-i18n="mp.spectating"></div>
 </div>
+
+<button id="lang-btn">繁體中文</button>
 
 <div class="screen visible" id="menu-screen">
   <h1>NEON STRIKE</h1>
-  <div class="sub">HOSTILE MACHINES DETECTED &mdash; SURVIVE THE WAVES</div>
+  <div class="sub" data-i18n="menu.subtitle"></div>
   <div id="menu-rank"></div>
-  <button class="btn" id="start-btn">ENGAGE</button>
-  <div class="controls">
-    <b>W A S D</b> move &nbsp; <b>MOUSE</b> aim &nbsp; <b>LMB</b> fire &nbsp; <b>RMB</b> aim down sights &nbsp; <b>G</b> grenade<br>
-    <b>SHIFT</b> sprint &nbsp; <b>C / CTRL</b> crouch &nbsp; <b>SPACE</b> jump &nbsp;
-    <b>1&ndash;8</b> / <b>WHEEL</b> weapons &nbsp; <b>R</b> reload &nbsp; <b>ESC</b> pause &nbsp; <b>~ / F1</b> dev console
+  <div class="btn-row">
+    <button class="btn" id="start-btn" data-i18n="menu.solo"></button>
+    <button class="btn secondary" id="mp-btn" data-i18n="menu.multiplayer"></button>
   </div>
+  <div class="controls" data-i18n-html="menu.controls"></div>
   <div class="arsenal" id="arsenal"></div>
 </div>
 
+<div class="screen" id="mp-screen">
+  <h2 data-i18n="mp.title"></h2>
+  <div class="sub" data-i18n="mp.subtitle"></div>
+  <div class="mp-form">
+    <div class="row">
+      <label data-i18n="mp.nickname"></label>
+      <input id="name-input" maxlength="16" autocomplete="off">
+    </div>
+    <div class="row">
+      <button class="btn" id="create-room-btn" data-i18n="mp.create"></button>
+      <input id="room-code-input" maxlength="4" autocomplete="off" placeholder="CODE">
+      <button class="btn secondary" id="join-code-btn" data-i18n="mp.join"></button>
+    </div>
+  </div>
+  <div style="font-size:12px;letter-spacing:2px;color:var(--neon-dim)">
+    <span data-i18n="mp.rooms"></span> &nbsp;
+    <button class="join-btn" id="refresh-btn" data-i18n="mp.refresh"></button>
+  </div>
+  <div id="room-list"><div class="empty" data-i18n="mp.noRooms"></div></div>
+  <div id="mp-status"></div>
+  <button class="btn secondary" id="mp-back-btn" style="margin-top:18px" data-i18n="mp.back"></button>
+</div>
+
+<div class="screen" id="lobby-screen">
+  <div id="lobby-code"></div>
+  <div class="sub" data-i18n="mp.players"></div>
+  <div id="lobby-players"></div>
+  <div class="btn-row">
+    <button class="btn" id="ready-btn" data-i18n="mp.ready"></button>
+    <button class="btn" id="start-match-btn" data-i18n="mp.start"></button>
+    <button class="btn secondary" id="leave-lobby-btn" data-i18n="mp.leave"></button>
+  </div>
+  <div id="lobby-status" style="margin-top:16px;font-size:13px;color:#8fd8e6;letter-spacing:2px"></div>
+</div>
+
+<div class="screen" id="mpover-screen">
+  <h2 data-i18n="mp.matchOver"></h2>
+  <div id="mp-scores"></div>
+  <button class="btn" id="mpover-lobby-btn" data-i18n="mp.backToLobby"></button>
+</div>
+
 <div class="screen" id="pause-screen">
-  <h2>PAUSED</h2>
-  <button class="btn" id="resume-btn">RESUME</button>
+  <h2 data-i18n="pause.title"></h2>
+  <div class="btn-row">
+    <button class="btn" id="resume-btn" data-i18n="pause.resume"></button>
+    <button class="btn secondary" id="pause-leave-btn" style="display:none" data-i18n="mp.leave"></button>
+  </div>
   <div class="settings">
-    <label>SENSITIVITY <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1"><span id="sens-value">1.0</span></label>
-    <label>VOLUME <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.7"><span id="vol-value">0.7</span></label>
+    <label><span data-i18n="pause.sensitivity"></span> <input type="range" id="sens-slider" min="0.3" max="2.5" step="0.1" value="1"><span id="sens-value">1.0</span></label>
+    <label><span data-i18n="pause.volume"></span> <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.7"><span id="vol-value">0.7</span></label>
   </div>
 </div>
 
 <div class="screen" id="gameover-screen">
-  <h1>SIGNAL LOST</h1>
+  <h1 data-i18n="over.title"></h1>
   <div class="stats">
-    SCORE <b id="final-score">0</b> &nbsp;&nbsp; WAVE <b id="final-wave">1</b> &nbsp;&nbsp; KILLS <b id="final-kills">0</b><br>
-    <span style="font-size:15px">BEST STREAK <b id="final-streak">0</b> &nbsp;&nbsp; BEST SCORE <b id="best-score">0</b></span><br>
+    <span data-i18n="over.score"></span> <b id="final-score">0</b> &nbsp;&nbsp;
+    <span data-i18n="over.wave"></span> <b id="final-wave">1</b> &nbsp;&nbsp;
+    <span data-i18n="over.kills"></span> <b id="final-kills">0</b><br>
+    <span style="font-size:15px"><span data-i18n="over.bestStreak"></span> <b id="final-streak">0</b> &nbsp;&nbsp;
+    <span data-i18n="over.bestScore"></span> <b id="best-score">0</b></span><br>
     <span style="font-size:14px" id="final-rank"></span>
     <div id="final-cheatnote" style="font-size:12px;color:#ffcf3b;letter-spacing:2px;margin-top:8px"></div>
   </div>
-  <button class="btn" id="restart-btn">RE-ENGAGE</button>
+  <button class="btn" id="restart-btn" data-i18n="over.restart"></button>
 </div>
 
 <div id="cheat-frame"><div id="cheat-badge">⚠ CHEATS ACTIVE</div></div>
 <div id="cheat-menu">
-  <div class="cm-title">DEV CONSOLE</div>
-  <div class="cm-hint">&#8593;&#8595; NAVIGATE &nbsp;&middot;&nbsp; ENTER TOGGLE &nbsp;&middot;&nbsp; ~ / F1 CLOSE</div>
+  <div class="cm-title" data-i18n="cheat.title"></div>
+  <div class="cm-hint" data-i18n="cheat.hint"></div>
   <ul id="cheat-list"></ul>
 </div>
 

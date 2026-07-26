@@ -1,25 +1,28 @@
 // Toggleable dev/cheat console: ~ or F1 opens, arrows navigate, Enter toggles.
 // States persist to localStorage. Disable entirely with ?nocheats=1.
+import { t } from './i18n.js';
+
 const CHEATS_KEY = 'neonstrike.cheats';
 
 export const CHEAT_DEFS = [
-  { id: 'god', name: 'GOD MODE', desc: 'player takes no damage' },
-  { id: 'infiniteAmmo', name: 'INFINITE AMMO', desc: 'magazine never depletes' },
-  { id: 'noReload', name: 'NO RELOAD', desc: 'reloads complete instantly' },
-  { id: 'instantKill', name: 'INSTANT KILL', desc: 'one shot eliminates anything' },
-  { id: 'unlockAll', name: 'UNLOCK ALL WEAPONS', desc: 'full arsenal regardless of rank' },
-  { id: 'maxLevel', name: 'MAX LEVEL', desc: 'max rank, all perks active' },
-  { id: 'slowMotion', name: 'SLOW MOTION', desc: 'cinematic 45% game speed' },
-  { id: 'radarAll', name: 'FULL RADAR', desc: 'radar shows every hostile' },
-  { id: 'infiniteGrenades', name: 'INFINITE GRENADES', desc: 'unlimited throwables' },
-  { id: 'spawnWave', name: 'SPAWN NEXT WAVE', desc: 'force the next wave now', action: true },
-  { id: 'reset', name: 'RESET ALL CHEATS', desc: 'turn everything off', action: true },
+  { id: 'god' },
+  { id: 'infiniteAmmo' },
+  { id: 'noReload' },
+  { id: 'instantKill' },
+  { id: 'unlockAll' },
+  { id: 'maxLevel' },
+  { id: 'slowMotion' },
+  { id: 'radarAll' },
+  { id: 'infiniteGrenades' },
+  { id: 'spawnWave', action: true },
+  { id: 'reset', action: true },
 ];
 
 export class CheatSystem {
   constructor(game, enabled) {
     this.game = game;
     this.enabled = enabled;
+    this.suspended = false;   // true during multiplayer matches
     this.open = false;
     this.sel = 0;
     this.flags = {};
@@ -50,8 +53,22 @@ export class CheatSystem {
     try { localStorage.setItem(CHEATS_KEY, JSON.stringify(this.flags)); } catch (e) { /* ok */ }
   }
 
+  get enabledNow() {
+    return this.enabled && !this.suspended;
+  }
+
+  is(id) {
+    return this.enabledNow && !!this.flags[id];
+  }
+
   anyActive() {
-    return this.enabled && Object.values(this.flags).some(Boolean);
+    return this.enabledNow && Object.values(this.flags).some(Boolean);
+  }
+
+  suspend(v) {
+    this.suspended = v;
+    if (v && this.open) this.toggleMenu(false);
+    this._syncIndicator();
   }
 
   activeCount() {
@@ -59,7 +76,7 @@ export class CheatSystem {
   }
 
   _onKey(e) {
-    if (!this.enabled) return;
+    if (!this.enabledNow) return;
     if (e.code === 'Backquote' || e.code === 'F1') {
       e.preventDefault();
       this.toggleMenu();
@@ -81,7 +98,7 @@ export class CheatSystem {
   }
 
   toggleMenu(force) {
-    if (!this.enabled) return;
+    if (!this.enabledNow && force !== false) return;
     this.open = force !== undefined ? force : !this.open;
     this.menuEl.classList.toggle('visible', this.open);
     if (this.open) this._render();
@@ -104,8 +121,8 @@ export class CheatSystem {
     if (this.flags[id] === value) return;
     this.flags[id] = value;
     this._save();
-    const def = CHEAT_DEFS.find((c) => c.id === id);
-    this.game.hud.killfeed(`CHEAT: ${def.name} ${value ? 'ON' : 'OFF'}`, 'cheat');
+    this.game.hud.killfeed(
+      t(value ? 'feed.cheatOn' : 'feed.cheatOff', { cheat: t(`cheat.${id}`) }), 'cheat');
     this._applySideEffects(id);
     this._syncIndicator();
     this._render();
@@ -116,13 +133,13 @@ export class CheatSystem {
       for (const k of Object.keys(this.flags)) {
         if (this.flags[k]) this.setFlag(k, false);
       }
-      this.game.hud.killfeed('CHEATS RESET', 'cheat');
+      this.game.hud.killfeed(t('feed.cheatsReset'), 'cheat');
     } else if (id === 'spawnWave') {
       if (this.game.playing) {
         this.game.enemies.forceNextWave();
-        this.game.hud.killfeed('CHEAT: WAVE FORCED', 'cheat');
+        this.game.hud.killfeed(t('feed.waveForced'), 'cheat');
       } else {
-        this.game.hud.killfeed('START A RUN FIRST', 'cheat');
+        this.game.hud.killfeed(t('feed.startRun'), 'cheat');
       }
     }
   }
@@ -147,9 +164,9 @@ export class CheatSystem {
 
   _syncIndicator() {
     const n = this.activeCount();
-    const on = this.enabled && n > 0;
+    const on = this.enabledNow && n > 0;
     this.frameEl.classList.toggle('visible', on);
-    if (on) this.badgeEl.textContent = `⚠ CHEATS ACTIVE (${n})`;
+    if (on) this.badgeEl.textContent = t('cheat.active', { n });
   }
 
   _buildList() {
@@ -173,8 +190,8 @@ export class CheatSystem {
       if (!li) return;
       const state = c.action ? '▶' : (this.flags[c.id] ? 'ON' : 'OFF');
       li.innerHTML =
-        `<span class="cm-name">${c.name}</span>` +
-        `<span class="cm-desc">${c.desc}</span>` +
+        `<span class="cm-name">${t(`cheat.${c.id}`)}</span>` +
+        `<span class="cm-desc">${t(`cheat.${c.id}.d`)}</span>` +
         `<span class="cm-state ${this.flags[c.id] ? 'on' : ''} ${c.action ? 'action' : ''}">${state}</span>`;
       li.classList.toggle('selected', i === this.sel);
     });

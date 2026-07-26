@@ -9,6 +9,8 @@ import { AudioFX } from './audio.js';
 import { HUD } from './hud.js';
 import { Progression, PERKS } from './progression.js';
 import { CheatSystem } from './cheats.js';
+import { Multiplayer } from './mp.js';
+import { t, setLang, getLang, applyDom } from './i18n.js';
 
 const BEST_KEY = 'neonstrike.best';
 const SETTINGS_KEY = 'neonstrike.settings';
@@ -17,10 +19,10 @@ const SETTINGS_KEY = 'neonstrike.settings';
 const CHEATS_ENABLED = new URLSearchParams(location.search).get('nocheats') !== '1';
 
 const STREAK_REWARDS = {
-  5: { name: 'RAMPAGE', bonus: 250 },
-  10: { name: 'ONSLAUGHT', bonus: 750, refill: true },
-  15: { name: 'UNSTOPPABLE', bonus: 2000, refill: true },
-  20: { name: 'GODLIKE', bonus: 4000, refill: true },
+  5: { bonus: 250 },
+  10: { bonus: 750, refill: true },
+  15: { bonus: 2000, refill: true },
+  20: { bonus: 4000, refill: true },
 };
 
 class Game {
@@ -32,6 +34,7 @@ class Game {
     this.bestStreak = 0;
     this.cheatsUsedThisRun = false;
     this.menuTime = 0;
+    this.mpOverlay = false;
 
     this.settings = { sensitivity: 1, volume: 0.7 };
     try {
@@ -63,12 +66,17 @@ class Game {
     this.player = new Player(this);
     this.effects = new Effects(this);
     this.weapons = new WeaponSystem(this);
-    this.enemies = new EnemyManager(this);
+    this.enemiesSolo = new EnemyManager(this);
+    this.enemies = this.enemiesSolo;
     this.pickups = new PickupManager(this);
     this.cheats = new CheatSystem(this, CHEATS_ENABLED);
+    this.mp = new Multiplayer(this);
+    this.ui = this._buildUi();
 
     this.weapons.rig.visible = false;
+    applyDom();
     this.hud.renderArsenal();
+    this.ui.syncLangButton();
 
     this.clock = new THREE.Clock();
 
@@ -81,8 +89,13 @@ class Game {
     // --- pointer lock ---
     document.addEventListener('pointerlockchange', () => {
       const locked = this.pointerLocked;
-      if (!locked && this.state === 'playing') this.pause();
-      else if (locked && this.state === 'paused') this.resumePlaying();
+      if (!locked && this.state === 'playing') {
+        if (this.mp.active) this._showMpOverlay();
+        else this.pause();
+      } else if (locked) {
+        if (this.state === 'paused') this.resumePlaying();
+        else if (this.mpOverlay) this._hideMpOverlay();
+      }
     });
 
     document.getElementById('start-btn').addEventListener('click', () => {
@@ -103,19 +116,27 @@ class Game {
       // resumePlaying happens on pointerlockchange; fall back for
       // environments where pointer lock is unavailable
       setTimeout(() => {
-        if (this.state === 'paused' && !this.pointerLocked) this.resumePlaying();
+        if (!this.pointerLocked) {
+          if (this.state === 'paused') this.resumePlaying();
+          else if (this.mpOverlay) this._hideMpOverlay();
+        }
       }, 250);
+    });
+    document.getElementById('pause-leave-btn').addEventListener('click', () => {
+      this._hideMpOverlay();
+      this.mp.leaveMatch();
     });
 
     // Recovery paths for playing without pointer lock (e.g. resume clicked
     // during the browser's ~1.25s re-lock cooldown after Esc): click re-locks,
     // Esc still pauses.
     this.renderer.domElement.addEventListener('mousedown', () => {
-      if (this.state === 'playing' && !this.pointerLocked) this.requestLock();
+      if (this.state === 'playing' && !this.pointerLocked && !this.mpOverlay) this.requestLock();
     });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape' && this.state === 'playing' && !this.pointerLocked) {
-        this.pause();
+        if (this.mp.active) this._showMpOverlay();
+        else this.pause();
       }
     });
 
@@ -139,6 +160,163 @@ class Game {
 
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  // ---------------- UI controller (menus, lobby, language) ----------------
+  _buildUi() {
+    const game = this;
+    const $ = (id) => document.getElementById(id);
+
+    const ui = {
+      syncLangButton() {
+        const btn = $('lang-btn');
+        btn.textContent = getLang() === 'en' ? '繁體中文' : 'English';
+        btn.classList.toggle('visible', game.state !== 'playing');
+      },
+      refreshText() {
+        applyDom();
+        game.hud.renderArsenal();
+        game.weapons.updateHud();
+        game.hud.setRank(game.progression.rankLabel);
+        game.cheats._render();
+        ui.syncLangButton();
+      },
+      showMenu() {
+        game.state = 'menu';
+        game.hud.hide();
+        game.hud.screen('menu');
+        game.hud.renderArsenal();
+        ui.syncLangButton();
+      },
+      showMpBrowser() {
+        game.hud.screen('mp');
+        ui.mpStatus('');
+        game.mp.listRooms();
+      },
+      showLobby() {
+        if (game.mp.room) ui.renderLobby(game.mp.room);
+        else ui.showMpBrowser();
+      },
+      mpStatus(text) {
+        $('mp-status').textContent = text || '';
+      },
+      async openMultiplayer() {
+        game.state = 'menu';
+        game.hud.screen('mp');
+        $('name-input').value = game.mp.name;
+        ui.mpStatus(t('mp.connecting'));
+        const ok = await game.mp.connect();
+        if (!ok) {
+          ui.mpStatus(t('mp.offline'));
+          return;
+        }
+        ui.mpStatus('');
+        game.mp.listRooms();
+      },
+      renderRoomList(rooms) {
+        const list = $('room-list');
+        list.innerHTML = '';
+        if (!rooms.length) {
+          const d = document.createElement('div');
+          d.className = 'empty';
+          d.textContent = t('mp.noRooms');
+          list.appendChild(d);
+          return;
+        }
+        for (const r of rooms) {
+          const row = document.createElement('div');
+          row.className = 'room-row';
+          const codeEl = document.createElement('b');
+          codeEl.textContent = r.code;
+          const host = document.createElement('span');
+          host.className = 'grow';
+          host.textContent = `${r.host} · ${r.count}/${r.max}` +
+            (r.started ? ` · ${t('mp.inMatch')}` : '');
+          const join = document.createElement('button');
+          join.className = 'join-btn';
+          join.textContent = t('mp.join');
+          join.disabled = r.count >= r.max;
+          join.addEventListener('click', () => {
+            game.mp.setName($('name-input').value);
+            game.mp.joinRoom(r.code);
+          });
+          row.append(codeEl, host, join);
+          list.appendChild(row);
+        }
+      },
+      renderLobby(room) {
+        game.hud.screen('lobby');
+        $('lobby-code').textContent = t('mp.room', { code: room.code });
+        const wrap = $('lobby-players');
+        wrap.innerHTML = '';
+        let meReady = false;
+        for (const p of room.players) {
+          if (p.id === game.mp.myId) meReady = p.ready;
+          const row = document.createElement('div');
+          row.className = 'p-row';
+          const name = document.createElement('span');
+          name.className = 'grow';
+          name.textContent = p.name + (p.id === game.mp.myId ? ' ◄' : '');
+          row.appendChild(name);
+          if (p.host) {
+            const tag = document.createElement('span');
+            tag.className = 'tag host';
+            tag.textContent = t('mp.host');
+            row.appendChild(tag);
+          } else {
+            const tag = document.createElement('span');
+            tag.className = `tag ${p.ready ? 'ready' : 'notready'}`;
+            tag.textContent = p.ready ? t('mp.ready') : t('mp.unready');
+            row.appendChild(tag);
+          }
+          wrap.appendChild(row);
+        }
+        const amHost = room.hostId === game.mp.myId;
+        $('ready-btn').style.display = amHost ? 'none' : '';
+        $('ready-btn').textContent = meReady ? t('mp.unready') : t('mp.ready');
+        $('start-match-btn').style.display = amHost ? '' : 'none';
+        $('lobby-status').textContent = amHost ? t('mp.waitReady') : t('mp.waitHost');
+        this._meReady = meReady;
+      },
+    };
+
+    $('mp-btn').addEventListener('click', () => {
+      game.audio.init();
+      ui.openMultiplayer();
+    });
+    $('mp-back-btn').addEventListener('click', () => {
+      if (game.mp.inRoom()) game.mp.leaveRoom();
+      ui.showMenu();
+    });
+    $('create-room-btn').addEventListener('click', () => {
+      game.mp.setName($('name-input').value);
+      game.mp.createRoom();
+    });
+    $('join-code-btn').addEventListener('click', () => {
+      game.mp.setName($('name-input').value);
+      const code = $('room-code-input').value.trim().toUpperCase();
+      if (code.length === 4) game.mp.joinRoom(code);
+    });
+    $('refresh-btn').addEventListener('click', () => game.mp.listRooms());
+    $('ready-btn').addEventListener('click', () => {
+      game.mp.setReady(!ui._meReady);
+    });
+    $('start-match-btn').addEventListener('click', () => {
+      game.audio.init();
+      game.applyVolume();
+      game.mp.requestStart();
+    });
+    $('leave-lobby-btn').addEventListener('click', () => {
+      game.mp.leaveRoom();
+      ui.showMpBrowser();
+    });
+    $('mpover-lobby-btn').addEventListener('click', () => ui.showLobby());
+    $('lang-btn').addEventListener('click', () => {
+      setLang(getLang() === 'en' ? 'zh-TW' : 'en');
+      ui.refreshText();
+    });
+
+    return ui;
   }
 
   _wireSettings() {
@@ -173,7 +351,7 @@ class Game {
 
   // god mode is cheat-backed; keep the plain property API for console/tests
   get godMode() {
-    return !!(this.cheats && this.cheats.flags.god);
+    return !!(this.cheats && this.cheats.is('god'));
   }
 
   set godMode(v) {
@@ -189,16 +367,18 @@ class Game {
 
   onRankUp(newRank) {
     this.hud.setRank(this.progression.rankLabel);
-    this.hud.banner(`RANK ${this.progression.rankLabel}`, 'streak');
+    this.hud.banner(t('banner.rank', { rank: this.progression.rankLabel }), 'streak');
     this.hud.bannerFadeSoon();
     this.audio.streak();
     for (const w of this.weapons.weapons) {
       if (w.def.unlockRank === newRank) {
-        this.hud.killfeed(`${w.def.name} UNLOCKED`, 'cheat');
+        this.hud.killfeed(t('feed.unlocked', { weapon: t(`weapon.${w.def.id}`) }), 'cheat');
       }
     }
     for (const p of PERKS) {
-      if (p.rank === newRank) this.hud.killfeed(`PERK: ${p.name}`, 'cheat');
+      if (p.rank === newRank) {
+        this.hud.killfeed(t('feed.perk', { perk: t(`perk.${p.id}`) }), 'cheat');
+      }
     }
     this.refreshPerks();
     this.hud.renderArsenal();
@@ -232,26 +412,110 @@ class Game {
     }
   }
 
-  startRun() {
+  _resetRunState() {
     this.score = 0;
     this.kills = 0;
     this.streak = 0;
     this.bestStreak = 0;
-    this.cheatsUsedThisRun = this.cheats ? this.cheats.anyActive() : false;
     this.state = 'playing';
     this.player.reset();
     this.weapons.reset();
     this.effects.reset();
     this.pickups.reset();
-    this.enemies.startGame();
     this.hud.setScore(0);
     this.hud.setStreak(0);
     this.hud.setRank(this.progression.rankLabel);
     this.hud.setHealth(this.player.hp, this.player.maxHp);
     this.hud.screen(null);
     this.hud.show();
-    this.hud.banner('SURVIVE', '');
+    this.hud.banner(t('banner.survive'), '');
     this.weapons.rig.visible = true;
+    this.ui.syncLangButton();
+  }
+
+  startRun() {
+    this.cheats.suspend(false);
+    this.cheatsUsedThisRun = this.cheats.anyActive();
+    this.enemies = this.enemiesSolo;
+    this._resetRunState();
+    this.enemies.startGame();
+  }
+
+  // multiplayer match entry (called by Multiplayer on 'started')
+  startMatch(mp) {
+    if (this.cheats.anyActive()) {
+      this.hud.killfeed(t('mp.cheatsDisabled'), 'cheat');
+    }
+    this.cheats.suspend(true);
+    this.cheatsUsedThisRun = false;
+    if (mp.isHost) {
+      this.enemies = this.enemiesSolo;
+    } else {
+      this.enemiesSolo.reset();
+      this.enemies = mp.replicas;
+    }
+    this._resetRunState();
+    if (mp.isHost) this.enemies.startGame();
+    this.requestLock(); // clients may lack a gesture; click-to-lock recovers
+  }
+
+  // multiplayer match exit
+  endMatch(reason, scores) {
+    this.cheats.suspend(false);
+    this.mpOverlay = false;
+    this.weapons.rig.visible = false;
+    this.hud.setScope(false);
+    this.hud.hide();
+    this.enemiesSolo.reset();
+    this.enemies = this.enemiesSolo;
+    this.state = 'gameover'; // reuse the orbit camera
+    if (document.pointerLockElement) document.exitPointerLock();
+
+    if (reason === 'over' || reason === 'hostLeft') {
+      const wrap = document.getElementById('mp-scores');
+      wrap.innerHTML = '';
+      const rows = [...scores.values()].sort((a, b) => b.score - a.score);
+      for (const r of rows) {
+        const row = document.createElement('div');
+        row.className = 's-row';
+        row.innerHTML =
+          `<span class="grow">${r.name}</span>` +
+          `<span>${t('mp.kills')} <b>${r.kills}</b></span>` +
+          `<span>${t('mp.score')} <b>${r.score}</b></span>`;
+        wrap.appendChild(row);
+      }
+      if (reason === 'hostLeft') {
+        const note = document.createElement('div');
+        note.style.cssText = 'margin-top:10px;font-size:13px;color:var(--warn);letter-spacing:2px';
+        note.textContent = t('mp.hostLeft');
+        wrap.appendChild(note);
+      }
+      this.hud.screen('mpover');
+    } else if (reason === 'lost') {
+      this.ui.showMenu();
+      this.hud.screen('mp');
+      this.ui.mpStatus(t('mp.err.lost'));
+    } else {
+      this.ui.showMenu();
+    }
+    this.ui.syncLangButton();
+  }
+
+  _showMpOverlay() {
+    if (this.mpOverlay) return;
+    this.mpOverlay = true;
+    this.player.keys.clear();
+    this.weapons.triggerHeld = false;
+    this.weapons.ads = false;
+    document.getElementById('pause-leave-btn').style.display = '';
+    this.hud.screen('pause');
+  }
+
+  _hideMpOverlay() {
+    if (!this.mpOverlay) return;
+    this.mpOverlay = false;
+    document.getElementById('pause-leave-btn').style.display = 'none';
+    this.hud.screen(null);
   }
 
   pause() {
@@ -259,18 +523,26 @@ class Game {
     this.state = 'paused';
     this.weapons.triggerHeld = false;
     this.weapons.ads = false;
+    document.getElementById('pause-leave-btn').style.display = 'none';
     this.hud.screen('pause');
+    this.ui.syncLangButton();
   }
 
   resumePlaying() {
     if (this.state !== 'paused') return;
     this.state = 'playing';
     this.hud.screen(null);
+    this.ui.syncLangButton();
     this.clock.getDelta(); // swallow the pause duration
   }
 
   gameOver() {
     if (this.state !== 'playing') return;
+    if (this.mp.active) {
+      // co-op: down, spectate until the next wave (or match over)
+      this.mp.onLocalDeath();
+      return;
+    }
     this.state = 'gameover';
     this.audio.gameOver();
     this.weapons.rig.visible = false;
@@ -289,11 +561,12 @@ class Game {
     const prog = this.progression;
     const next = prog.nextThreshold();
     const rankLine = next === null
-      ? `RANK ${prog.rankLabel}`
-      : `RANK ${prog.rankLabel} — ${prog.xp} / ${next} XP`;
+      ? t('over.rank', { rank: prog.rankLabel })
+      : t('over.rankXp', { rank: prog.rankLabel, xp: prog.xp, next });
     this.hud.showGameOver(this.score, this.enemies.wave, this.kills, this.bestStreak,
       best, rankLine, this.cheatsUsedThisRun);
     this.hud.renderArsenal();
+    this.ui.syncLangButton();
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
@@ -303,17 +576,22 @@ class Game {
     if (!this.cheatsUsedThisRun) this.progression.addXp(n);
   }
 
-  addKill(typeName = 'hostile') {
+  addKill(typeName = 'grunt') {
+    this.hud.killfeed(t('feed.eliminated', { enemy: t(`enemy.${typeName}`) }));
+    this.addKillMp();
+  }
+
+  // kill accounting without the solo killfeed line (mp feed formats its own)
+  addKillMp() {
     this.kills++;
     this.streak++;
     this.bestStreak = Math.max(this.bestStreak, this.streak);
     this.hud.setStreak(this.streak);
-    this.hud.killfeed(`${typeName.toUpperCase()} ELIMINATED`);
     const reward = STREAK_REWARDS[this.streak];
     if (reward) {
       this.addScore(reward.bonus);
       if (reward.refill) this.weapons.addReserveAll(2);
-      this.hud.banner(`${reward.name}  +${reward.bonus}`, 'streak');
+      this.hud.banner(`${t(`streak.${this.streak}`)}  +${reward.bonus}`, 'streak');
       this.hud.bannerFadeSoon();
       this.audio.streak();
     }
@@ -340,6 +618,7 @@ class Game {
   applySplash(pos, radius, dmg) {
     this.effects.explosion(pos);
     this.audio.explosion();
+    if (this.mp.active) this.mp.sendBoom(pos);
     const origin = pos.clone();
     origin.y += 0.25; // lift off the floor so the LOS ray doesn't graze it
 
@@ -373,19 +652,21 @@ class Game {
 
     if (this.state === 'playing') {
       if (this.cheats.anyActive()) this.cheatsUsedThisRun = true;
-      const gdt = this.cheats.flags.slowMotion ? dt * 0.45 : dt;
+      const gdt = this.cheats.is('slowMotion') ? dt * 0.45 : dt;
       this.player.update(gdt);
       this.weapons.update(gdt);
       this.enemies.update(gdt);
       this.pickups.update(gdt);
       this.effects.update(gdt);
-      this.hud.updateRadar(this.player, this.enemies.list, this.pickups.list);
+      this.mp.update(dt);
+      this.hud.updateRadar(this.player, this.enemies.list, this.pickups.list,
+        this.mp.active ? this.mp.remoteList() : []);
       this.hud.updateCompass(this.player.yaw);
     } else if (this.state === 'menu' || this.state === 'gameover') {
       // slow orbiting camera behind the menu
       this.menuTime += dt;
-      const t = this.menuTime * 0.12;
-      this.camera.position.set(Math.sin(t) * 24, 9 + Math.sin(t * 0.7) * 2, Math.cos(t) * 24);
+      const tt = this.menuTime * 0.12;
+      this.camera.position.set(Math.sin(tt) * 24, 9 + Math.sin(tt * 0.7) * 2, Math.cos(tt) * 24);
       this.camera.lookAt(0, 1.5, 0);
       this.effects.update(dt);
     }

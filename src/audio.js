@@ -164,6 +164,10 @@ export class AudioFX {
     this._tone({ freq: 784, dur: 0.22, gain: 0.26, type: 'triangle', delay: 0.24 });
   }
 
+  remoteShot() {
+    this._noise({ dur: 0.06, gain: 0.14, freq: 2200, freqEnd: 400 });
+  }
+
   enemyShot() {
     this._tone({ freq: 800, freqEnd: 300, dur: 0.12, gain: 0.14, type: 'sawtooth' });
   }

@@ -1,27 +1,35 @@
 # NEON STRIKE — 3D Web FPS
 
 A wave-survival 3D first-person shooter inspired by Call of Duty, with a
-minimalist neon aesthetic, that runs entirely in the browser. No build step,
-no external network requests — Three.js is vendored in `lib/`, all textures
-are generated procedurally, and every sound effect is synthesized with
-WebAudio at runtime.
+minimalist neon aesthetic, that runs entirely in the browser — solo offline,
+or online co-op with rooms. No build step, no external assets — Three.js is
+vendored in `lib/`, all textures are generated procedurally, and every sound
+effect is synthesized with WebAudio at runtime. UI is available in English
+and Traditional Chinese (Taiwan) — 支援繁體中文（台灣）介面.
 
 ![Gameplay](docs/screenshot.png)
 
-## Play
-
-ES modules require an HTTP server (opening `index.html` via `file://` won't work).
-From the repo root, run any static server:
+## Run the full game (server + multiplayer)
 
 ```sh
-# Python
-python3 -m http.server 8080
-
-# ...or Node
-npx serve .
+npm install
+npm start          # serves the game and the room server on :8080
 ```
 
-Then open <http://localhost:8080> and click **ENGAGE**.
+Open <http://localhost:8080>. **SOLO** starts an offline run; **MULTIPLAYER**
+opens the room browser — create a room, share the 4-letter code, ready up,
+and fight waves together (up to 4 players). Set `PORT` to change the port;
+the server is a single Node process (static files + WebSocket room hub) and
+deploys to any Node host.
+
+## Solo without Node
+
+The frontend is fully static — any HTTP server works for single-player
+(multiplayer needs the Node server):
+
+```sh
+python3 -m http.server 8080
+```
 
 ## Controls
 
@@ -115,6 +123,24 @@ Destroyed enemies drop **health packs**, **ammo cells** (a magazine for every
 weapon), or **grenade cells**. Score and best streak are tracked with a
 persistent local best.
 
+## Multiplayer design
+
+The server (`server/server.js`) manages rooms and relays JSON messages; it
+runs no simulation. The room host's browser simulates enemies with the same
+code as solo play and broadcasts 10 Hz snapshots; other clients render
+interpolated replicas, raycast hits locally, and send damage claims that the
+host applies authoritatively. Player states replicate at 15 Hz with name-tag
+avatars, kill attribution feeds a shared scoreboard, downed operatives
+spectate and redeploy on the next wave, and the match ends when every
+operative is down. Cheats are disabled during multiplayer matches. If the
+host disconnects mid-match the match ends and the room returns to the lobby.
+
+## Language / 語言
+
+The language toggle (top-right of the menus) switches between English and
+繁體中文（台灣）, persists locally, and auto-detects `zh-*` browsers on first
+visit.
+
 ## Tech notes
 
 - [Three.js](https://threejs.org/) r170, vendored as a single ES module in
@@ -129,6 +155,10 @@ persistent local best.
   sidestep recovery, and raycast line-of-sight checks for ranged attacks.
 - Procedural canvas textures, DOM/CSS HUD with canvas radar + compass,
   WebAudio-synthesized SFX.
+- Node + `ws` room server; co-op uses host-authoritative simulation with
+  client-side hit claims and interpolated replication.
+- i18n via a tiny dictionary module (`src/i18n.js`) with `data-i18n` DOM
+  bindings; adding a language means adding one table.
 
 ## Development
 

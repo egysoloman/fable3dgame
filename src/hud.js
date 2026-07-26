@@ -1,4 +1,5 @@
 // DOM/canvas HUD: health, ammo, radar, compass, kill feed, hitmarkers, banners.
+import { t } from './i18n.js';
 const COMPASS_POINTS = [
   [0, 'N'], [45, 'NE'], [90, 'E'], [135, 'SE'], [180, 'S'], [225, 'SW'], [270, 'W'], [315, 'NW'],
 ];
@@ -63,6 +64,9 @@ export class HUD {
     this.el.menuScreen.classList.toggle('visible', name === 'menu');
     this.el.pauseScreen.classList.toggle('visible', name === 'pause');
     this.el.gameoverScreen.classList.toggle('visible', name === 'gameover');
+    document.getElementById('mp-screen').classList.toggle('visible', name === 'mp');
+    document.getElementById('lobby-screen').classList.toggle('visible', name === 'lobby');
+    document.getElementById('mpover-screen').classList.toggle('visible', name === 'mpover');
   }
 
   setHealth(hp, maxHp) {
@@ -83,11 +87,11 @@ export class HUD {
 
   setGrenades(n, infinite = false) {
     this.el.grenadeRow.textContent = infinite ? '⬢ ∞' : (n > 0 ? '⬢'.repeat(n) : '');
-    this.el.grenadeRow.title = `${infinite ? 'unlimited' : n} grenades [G]`;
+    this.el.grenadeRow.title = t('hud.grenades', { n: infinite ? '∞' : n });
   }
 
   setRank(label) {
-    this.el.rankValue.textContent = `RANK ${label}`;
+    this.el.rankValue.textContent = t('hud.rank', { rank: label });
   }
 
   renderArsenal() {
@@ -95,19 +99,20 @@ export class HUD {
     const prog = this.game.progression;
     const defs = this.game.weapons.weapons.map((w) => w.def);
     const parts = defs.map((d, i) => {
-      const unlocked = prog.isUnlocked(d);
-      return unlocked
-        ? `<b>${i + 1}</b> ${d.name}`
-        : `<span class="locked">🔒 ${d.name} (RANK ${d.unlockRank})</span>`;
+      const name = t(`weapon.${d.id}`);
+      return prog.isUnlocked(d)
+        ? `<b>${i + 1}</b> ${name}`
+        : `<span class="locked">${t('menu.locked', { weapon: name, need: d.unlockRank })}</span>`;
     });
     this.el.arsenal.innerHTML =
-      'ARSENAL: ' + parts.slice(0, 4).join(' &middot; ') + '<br>' +
+      `${t('menu.arsenal')}: ` + parts.slice(0, 4).join(' &middot; ') + '<br>' +
       parts.slice(4).join(' &middot; ');
 
     const next = prog.nextUnlock(defs);
     this.el.menuRank.textContent = next
-      ? `RANK ${prog.rankLabel} — NEXT UNLOCK: ${next.name} AT RANK ${next.unlockRank}`
-      : `RANK ${prog.rankLabel} — FULL ARSENAL UNLOCKED`;
+      ? t('menu.nextUnlock', {
+          rank: prog.rankLabel, weapon: t(`weapon.${next.id}`), need: next.unlockRank })
+      : t('menu.fullArsenal', { rank: prog.rankLabel });
   }
 
   setScore(score) {
@@ -115,7 +120,7 @@ export class HUD {
   }
 
   setStreak(streak) {
-    this.el.streakValue.textContent = streak >= 3 ? `STREAK ×${streak}` : '';
+    this.el.streakValue.textContent = streak >= 3 ? t('hud.streak', { n: streak }) : '';
   }
 
   setWave(wave) {
@@ -123,7 +128,7 @@ export class HUD {
   }
 
   setEnemiesLeft(n) {
-    this.el.enemiesLeft.textContent = n > 0 ? `HOSTILES: ${n}` : '';
+    this.el.enemiesLeft.textContent = n > 0 ? t('hud.hostiles', { n }) : '';
   }
 
   // spread: radian cone half-angle; -1 hides the crosshair (sniper scope)
@@ -207,7 +212,7 @@ export class HUD {
     setTimeout(() => div.remove(), 1100);
   }
 
-  updateRadar(player, enemies, pickups) {
+  updateRadar(player, enemies, pickups, teammates = []) {
     const ctx = this.radarCtx;
     const S = 140, C = S / 2, RANGE = 34;
     ctx.clearRect(0, 0, S, S);
@@ -219,7 +224,7 @@ export class HUD {
     ctx.beginPath(); ctx.moveTo(C, 4); ctx.lineTo(C, S - 4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(4, C); ctx.lineTo(S - 4, C); ctx.stroke();
 
-    const showAll = !!(this.game && this.game.cheats && this.game.cheats.flags.radarAll);
+    const showAll = !!(this.game && this.game.cheats && this.game.cheats.is('radarAll'));
     const cos = Math.cos(player.yaw);
     const sin = Math.sin(player.yaw);
     const plot = (wx, wz, clampToRim) => {
@@ -252,6 +257,14 @@ export class HUD {
       ctx.beginPath();
       ctx.arc(p[0], p[1], e.type.scale > 1.2 ? 4 : 2.8, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // teammates
+    ctx.fillStyle = 'rgba(120, 240, 255, 0.95)';
+    for (const tm of teammates) {
+      if (!tm.alive) continue;
+      const p = plot(tm.position.x, tm.position.z, true);
+      if (p) ctx.fillRect(p[0] - 2.5, p[1] - 2.5, 5, 5);
     }
 
     // player wedge

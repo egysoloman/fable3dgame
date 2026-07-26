@@ -1,0 +1,256 @@
+// NEON STRIKE server: static file host + WebSocket room hub.
+// The server manages rooms and relays messages; gameplay simulation runs on
+// the room host's client, so server CPU stays negligible.
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { WebSocketServer } = require('ws');
+
+const PORT = process.env.PORT || 8080;
+const ROOT = path.join(__dirname, '..');
+const MAX_PLAYERS = 4;
+const MAX_ROOMS = 200;
+const MAX_MSG_BYTES = 32 * 1024;
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.md': 'text/markdown; charset=utf-8',
+};
+
+const server = http.createServer((req, res) => {
+  let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (urlPath === '/') urlPath = '/index.html';
+  if (urlPath === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, rooms: rooms.size, clients: clients.size }));
+    return;
+  }
+  const filePath = path.join(ROOT, urlPath);
+  if (!filePath.startsWith(ROOT)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(data);
+  });
+});
+
+// ---------- rooms ----------
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: MAX_MSG_BYTES });
+const clients = new Map(); // id -> { ws, name, roomCode }
+const rooms = new Map();   // code -> { code, players: Map<id, {name, ready}>, hostId, started }
+
+let nextId = 1;
+
+function makeCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let tries = 0; tries < 50; tries++) {
+    let code = '';
+    for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    if (!rooms.has(code)) return code;
+  }
+  return null;
+}
+
+function send(id, obj) {
+  const c = clients.get(id);
+  if (c && c.ws.readyState === 1) c.ws.send(JSON.stringify(obj));
+}
+
+function roomStatePayload(room) {
+  return {
+    t: 'roomState',
+    code: room.code,
+    hostId: room.hostId,
+    started: room.started,
+    players: [...room.players.entries()].map(([id, p]) => ({
+      id, name: p.name, ready: p.ready, host: id === room.hostId,
+    })),
+  };
+}
+
+function broadcastRoom(room, obj, exceptId = null) {
+  for (const id of room.players.keys()) {
+    if (id !== exceptId) send(id, obj);
+  }
+}
+
+function roomListPayload() {
+  const list = [];
+  for (const room of rooms.values()) {
+    list.push({
+      code: room.code,
+      count: room.players.size,
+      max: MAX_PLAYERS,
+      started: room.started,
+      host: room.players.get(room.hostId)?.name || '?',
+    });
+    if (list.length >= 50) break;
+  }
+  return { t: 'roomList', rooms: list };
+}
+
+function leaveRoom(id, notifySelf) {
+  const c = clients.get(id);
+  if (!c || !c.roomCode) return;
+  const room = rooms.get(c.roomCode);
+  c.roomCode = null;
+  if (!room) return;
+  room.players.delete(id);
+  if (room.players.size === 0) {
+    rooms.delete(room.code);
+    return;
+  }
+  if (room.hostId === id) {
+    // promote the longest-standing remaining player
+    room.hostId = room.players.keys().next().value;
+    if (room.started) {
+      // gameplay is simulated on the host client; a mid-match host loss ends the match
+      room.started = false;
+      for (const p of room.players.values()) p.ready = false;
+      broadcastRoom(room, { t: 'hostLeft' });
+    }
+  }
+  broadcastRoom(room, roomStatePayload(room));
+  if (notifySelf) send(id, { t: 'leftRoom' });
+}
+
+wss.on('connection', (ws) => {
+  const id = String(nextId++);
+  clients.set(id, { ws, name: 'PLAYER', roomCode: null });
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+  send(id, { t: 'welcome', id });
+
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch (e) { return; }
+    if (!msg || typeof msg.t !== 'string') return;
+    const c = clients.get(id);
+    if (!c) return;
+    const room = c.roomCode ? rooms.get(c.roomCode) : null;
+
+    switch (msg.t) {
+      case 'hello': {
+        c.name = String(msg.name || 'PLAYER').slice(0, 16).trim() || 'PLAYER';
+        break;
+      }
+      case 'list': {
+        send(id, roomListPayload());
+        break;
+      }
+      case 'create': {
+        if (room) leaveRoom(id, false);
+        if (rooms.size >= MAX_ROOMS) { send(id, { t: 'error', code: 'serverFull' }); break; }
+        const code = makeCode();
+        if (!code) { send(id, { t: 'error', code: 'serverFull' }); break; }
+        const newRoom = {
+          code,
+          players: new Map([[id, { name: c.name, ready: false }]]),
+          hostId: id,
+          started: false,
+        };
+        rooms.set(code, newRoom);
+        c.roomCode = code;
+        send(id, roomStatePayload(newRoom));
+        break;
+      }
+      case 'join': {
+        if (room) leaveRoom(id, false);
+        const code = String(msg.code || '').toUpperCase().trim();
+        const target = rooms.get(code);
+        if (!target) { send(id, { t: 'error', code: 'noRoom' }); break; }
+        if (target.players.size >= MAX_PLAYERS) { send(id, { t: 'error', code: 'roomFull' }); break; }
+        target.players.set(id, { name: c.name, ready: false });
+        c.roomCode = code;
+        broadcastRoom(target, roomStatePayload(target));
+        break;
+      }
+      case 'leave': {
+        leaveRoom(id, true);
+        break;
+      }
+      case 'ready': {
+        if (!room || room.started) break;
+        const p = room.players.get(id);
+        if (p) p.ready = !!msg.v;
+        broadcastRoom(room, roomStatePayload(room));
+        break;
+      }
+      case 'start': {
+        if (!room || room.hostId !== id || room.started) break;
+        let allReady = true;
+        for (const [pid, p] of room.players) {
+          if (pid !== room.hostId && !p.ready) allReady = false;
+        }
+        if (!allReady) { send(id, { t: 'error', code: 'notReady' }); break; }
+        room.started = true;
+        broadcastRoom(room, { t: 'started', hostId: room.hostId });
+        broadcastRoom(room, roomStatePayload(room));
+        break;
+      }
+      case 'end': {
+        // host declares the match over; room returns to lobby
+        if (!room || room.hostId !== id) break;
+        room.started = false;
+        for (const p of room.players.values()) p.ready = false;
+        broadcastRoom(room, roomStatePayload(room));
+        break;
+      }
+      case 'msg': {
+        // gameplay relay to everyone else in the room
+        if (!room) break;
+        broadcastRoom(room, { t: 'relay', from: id, d: msg.d }, id);
+        break;
+      }
+      case 'msgTo': {
+        if (!room) break;
+        const to = String(msg.to || '');
+        if (room.players.has(to)) send(to, { t: 'relay', from: id, d: msg.d });
+        break;
+      }
+      case 'ping': {
+        send(id, { t: 'pong', ts: msg.ts });
+        break;
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    leaveRoom(id, false);
+    clients.delete(id);
+  });
+  ws.on('error', () => { /* close will follow */ });
+});
+
+// drop dead connections
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) { ws.terminate(); continue; }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+wss.on('close', () => clearInterval(heartbeat));
+
+server.listen(PORT, () => {
+  console.log(`NEON STRIKE server listening on http://0.0.0.0:${PORT}`);
+});

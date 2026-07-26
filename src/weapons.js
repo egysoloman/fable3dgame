@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t } from './i18n.js';
 
 const HIP_POS = new THREE.Vector3(0.28, -0.26, -0.5);
 
@@ -369,8 +370,10 @@ export class WeaponSystem {
     if (!this.game.progression.isUnlocked(this.weapons[i].def)) {
       if (!silent) {
         this.game.audio.empty();
-        this.game.hud.killfeed(
-          `${this.weapons[i].def.name} LOCKED — RANK ${this.weapons[i].def.unlockRank}`, 'cheat');
+        this.game.hud.killfeed(t('feed.locked', {
+          weapon: t(`weapon.${this.weapons[i].def.id}`),
+          need: this.weapons[i].def.unlockRank,
+        }), 'cheat');
       }
       return;
     }
@@ -387,7 +390,7 @@ export class WeaponSystem {
     const w = this.current;
     if (w.reloading || w.ammo >= w.def.magSize || w.reserve <= 0) return;
     const cheats = this.game.cheats;
-    if (cheats && cheats.flags.noReload) {
+    if (cheats && cheats.is('noReload')) {
       // instant reload: still consumes reserve, skips the animation
       const need = w.def.magSize - w.ammo;
       const take = w.reserve === Infinity ? need : Math.min(need, w.reserve);
@@ -405,7 +408,7 @@ export class WeaponSystem {
   }
 
   throwGrenade() {
-    const infinite = this.game.cheats && this.game.cheats.flags.infiniteGrenades;
+    const infinite = this.game.cheats && this.game.cheats.is('infiniteGrenades');
     if ((this.grenades <= 0 && !infinite) || this.grenadeCooldown > 0) return;
     if (!infinite) this.grenades--;
     this.grenadeCooldown = 0.7;
@@ -450,7 +453,7 @@ export class WeaponSystem {
       return;
     }
 
-    if (!(this.game.cheats && this.game.cheats.flags.infiniteAmmo)) w.ammo--;
+    if (!(this.game.cheats && this.game.cheats.is('infiniteAmmo'))) w.ammo--;
     w.cooldown = w.def.fireDelay;
     w.bloom = Math.min(w.def.bloom * 6, w.bloom + w.def.bloom);
     this.game.audio.shot(w.def.sound);
@@ -485,6 +488,7 @@ export class WeaponSystem {
         ...this.game.enemies.aliveGroups(),
       ];
       const spread = this.currentSpread();
+      let lastEnd = null;
       for (let p = 0; p < w.def.pellets; p++) {
         const dir = baseDir.clone();
         dir.x += (Math.random() - 0.5) * 2 * spread;
@@ -503,6 +507,7 @@ export class WeaponSystem {
           break;
         }
         if (!end) end = camPos.clone().addScaledVector(dir, 150);
+        lastEnd = end;
 
         this.game.effects.tracer(muzzlePos, end, w.def.tracer);
 
@@ -515,6 +520,9 @@ export class WeaponSystem {
         } else if (end) {
           this.game.effects.impactSparks(end);
         }
+      }
+      if (this.game.mp && this.game.mp.active && lastEnd) {
+        this.game.mp.sendShot(muzzlePos, lastEnd, w.def.tracer);
       }
     }
 
@@ -614,8 +622,8 @@ export class WeaponSystem {
 
   updateHud() {
     const w = this.current;
-    this.game.hud.setAmmo(w.def.name, w.ammo, w.reserve, w.reloading);
+    this.game.hud.setAmmo(t(`weapon.${w.def.id}`), w.ammo, w.reserve, w.reloading);
     this.game.hud.setGrenades(this.grenades,
-      !!(this.game.cheats && this.game.cheats.flags.infiniteGrenades));
+      !!(this.game.cheats && this.game.cheats.is('infiniteGrenades')));
   }
 }

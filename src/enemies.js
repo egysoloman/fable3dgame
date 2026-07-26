@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t } from './i18n.js';
 
 const GRAVITY = 26;
 
@@ -37,10 +38,77 @@ const barBgMat = new THREE.MeshBasicMaterial({
 });
 const projMat = new THREE.MeshBasicMaterial({ color: 0xff6a2a });
 
+// Builds the robot body used by enemies, enemy replicas, and teammate avatars.
+export function buildEnemyBody(look, withBar = true) {
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: look.color, roughness: 0.55, metalness: 0.45,
+    emissive: look.color, emissiveIntensity: 0.12,
+  });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: look.eyeColor });
+
+  const g = new THREE.Group();
+
+  const torso = new THREE.Mesh(torsoGeo, bodyMat);
+  torso.position.y = 1.02;
+  torso.castShadow = true;
+  g.add(torso);
+
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.position.y = 1.62;
+  head.castShadow = true;
+  g.add(head);
+
+  const eye = new THREE.Mesh(eyeGeo, eyeMat);
+  eye.position.set(0, 1.62, 0.21);
+  eye.raycast = () => {};
+  g.add(eye);
+
+  const legL = new THREE.Mesh(legGeo, bodyMat);
+  legL.position.set(-0.19, 0.64, 0);
+  legL.castShadow = true;
+  g.add(legL);
+  const legR = new THREE.Mesh(legGeo, bodyMat);
+  legR.position.set(0.19, 0.64, 0);
+  legR.castShadow = true;
+  g.add(legR);
+
+  const armL = new THREE.Mesh(armGeo, bodyMat);
+  armL.position.set(-0.45, 1.36, 0);
+  g.add(armL);
+  const armR = new THREE.Mesh(armGeo, bodyMat);
+  armR.position.set(0.45, 1.36, 0);
+  g.add(armR);
+
+  let bar = null, barBg = null, barMat = null;
+  if (withBar) {
+    barMat = new THREE.MeshBasicMaterial({
+      color: 0x35ff6a, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide,
+    });
+    barBg = new THREE.Mesh(barGeo, barBgMat);
+    barBg.position.y = 2.12;
+    barBg.raycast = () => {};
+    g.add(barBg);
+    bar = new THREE.Mesh(barGeo, barMat);
+    bar.position.y = 2.12;
+    bar.raycast = () => {};
+    g.add(bar);
+  }
+
+  return {
+    group: g, head, eye, legL, legR, armL, armR, bar, barBg, bodyMat, eyeMat, barMat,
+    dispose() {
+      bodyMat.dispose();
+      eyeMat.dispose();
+      if (barMat) barMat.dispose();
+    },
+  };
+}
+
 class Enemy {
-  constructor(game, type, pos, mods) {
+  constructor(game, type, pos, mods, id) {
     this.game = game;
     this.type = type;
+    this.id = id;
     this.hp = Math.round(type.hp * mods.hpMul);
     this.maxHp = this.hp;
     this.speed = type.speed * mods.speedMul;
@@ -59,67 +127,42 @@ class Enemy {
     this.halfW = 0.42 * type.scale;
     this.height = 1.85 * type.scale;
 
-    // --- build body ---
-    this.bodyMat = new THREE.MeshStandardMaterial({
-      color: type.color, roughness: 0.55, metalness: 0.45,
-      emissive: type.color, emissiveIntensity: 0.12,
-    });
-    this.eyeMat = new THREE.MeshBasicMaterial({ color: type.eyeColor });
-    this.barMat = new THREE.MeshBasicMaterial({
-      color: 0x35ff6a, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide,
-    });
+    const body = buildEnemyBody(type, true);
+    this.parts = body;
+    this.group = body.group;
+    this.bodyMat = body.bodyMat;
+    this.head = body.head;
+    this.head.userData.headshot = true;
+    this.legL = body.legL;
+    this.legR = body.legR;
+    this.armL = body.armL;
+    this.armR = body.armR;
+    this.bar = body.bar;
+    this.barBg = body.barBg;
+    this.barMat = body.barMat;
 
-    const g = new THREE.Group();
-    this.group = g;
+    this.group.traverse((o) => { o.userData.enemy = this; });
+    this.group.position.copy(this.position);
+    this.group.scale.setScalar(0.01);
+    game.scene.add(this.group);
+  }
 
-    const torso = new THREE.Mesh(torsoGeo, this.bodyMat);
-    torso.position.y = 1.02;
-    torso.castShadow = true;
-    g.add(torso);
-
-    const head = new THREE.Mesh(headGeo, this.bodyMat);
-    head.position.y = 1.62;
-    head.castShadow = true;
-    head.userData.headshot = true;
-    g.add(head);
-    this.head = head;
-
-    const eye = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eye.position.set(0, 1.62, 0.21);
-    eye.raycast = () => {};
-    g.add(eye);
-
-    this.legL = new THREE.Mesh(legGeo, this.bodyMat);
-    this.legL.position.set(-0.19, 0.64, 0);
-    this.legL.castShadow = true;
-    g.add(this.legL);
-    this.legR = new THREE.Mesh(legGeo, this.bodyMat);
-    this.legR.position.set(0.19, 0.64, 0);
-    this.legR.castShadow = true;
-    g.add(this.legR);
-
-    this.armL = new THREE.Mesh(armGeo, this.bodyMat);
-    this.armL.position.set(-0.45, 1.36, 0);
-    g.add(this.armL);
-    this.armR = new THREE.Mesh(armGeo, this.bodyMat);
-    this.armR.position.set(0.45, 1.36, 0);
-    g.add(this.armR);
-
-    // health bar
-    this.barBg = new THREE.Mesh(barGeo, barBgMat);
-    this.barBg.position.y = 2.12;
-    this.barBg.raycast = () => {};
-    g.add(this.barBg);
-    this.bar = new THREE.Mesh(barGeo, this.barMat);
-    this.bar.position.y = 2.12;
-    this.bar.raycast = () => {};
-    g.add(this.bar);
-
-    g.traverse((o) => { o.userData.enemy = this; });
-
-    g.position.copy(this.position);
-    g.scale.setScalar(0.01);
-    game.scene.add(g);
+  // Nearest living target: solo = the player; co-op host = any operative.
+  _pickTarget() {
+    const game = this.game;
+    if (game.mp && game.mp.active && game.mp.isHost) {
+      const targets = game.mp.targetList();
+      let best = null, bd = Infinity;
+      for (const tg of targets) {
+        const d = Math.hypot(tg.position.x - this.position.x, tg.position.z - this.position.z);
+        if (d < bd) { bd = d; best = tg; }
+      }
+      return best;
+    }
+    if (game.player.alive) {
+      return { id: null, position: game.player.position, isLocal: true };
+    }
+    return null;
   }
 
   update(dt) {
@@ -127,30 +170,34 @@ class Enemy {
     if (!this.alive) {
       // death animation: crumple and sink
       this.dying += dt;
-      const t = Math.min(1, this.dying / 0.6);
+      const tt = Math.min(1, this.dying / 0.6);
       g.scale.set(
-        this.type.scale * (1 + t * 0.4),
-        Math.max(0.01, this.type.scale * (1 - t)),
-        this.type.scale * (1 + t * 0.4)
+        this.type.scale * (1 + tt * 0.4),
+        Math.max(0.01, this.type.scale * (1 - tt)),
+        this.type.scale * (1 + tt * 0.4)
       );
-      this.bodyMat.opacity = 1 - t;
+      this.bodyMat.opacity = 1 - tt;
       return this.dying < 0.65;
     }
 
     if (this.spawnTimer > 0) {
       this.spawnTimer -= dt;
-      const t = 1 - Math.max(0, this.spawnTimer) / 0.35;
-      g.scale.setScalar(this.type.scale * t);
+      const tt = 1 - Math.max(0, this.spawnTimer) / 0.35;
+      g.scale.setScalar(this.type.scale * tt);
       g.position.copy(this.position);
       return true;
     }
     g.scale.setScalar(this.type.scale);
 
-    const player = this.game.player;
-    const toPlayer = new THREE.Vector3().subVectors(player.position, this.position);
-    toPlayer.y = 0;
-    const dist = toPlayer.length();
-    if (dist > 0.001) toPlayer.divideScalar(dist);
+    const target = this._pickTarget();
+    const toTarget = new THREE.Vector3();
+    let dist = 999;
+    if (target) {
+      toTarget.subVectors(target.position, this.position);
+      toTarget.y = 0;
+      dist = toTarget.length();
+      if (dist > 0.001) toTarget.divideScalar(dist);
+    }
 
     // --- steering ---
     this.strafeFlip -= dt;
@@ -158,16 +205,18 @@ class Enemy {
       this.strafeFlip = 2 + Math.random() * 2.5;
       this.strafeSign *= -1;
     }
-    const perp = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).multiplyScalar(this.strafeSign);
+    const perp = new THREE.Vector3(-toTarget.z, 0, toTarget.x).multiplyScalar(this.strafeSign);
 
     let moveDir = new THREE.Vector3();
-    const t = this.type;
-    if (t.attack === 'melee') {
-      if (dist > t.meleeRange * 0.85) moveDir.copy(toPlayer);
-    } else {
-      if (dist > t.shootRange * 0.9) moveDir.copy(toPlayer);
-      else if (dist < t.keepDistance) moveDir.copy(toPlayer).negate().addScaledVector(perp, 0.7);
-      else moveDir.copy(perp).multiplyScalar(0.8);
+    const ty = this.type;
+    if (target) {
+      if (ty.attack === 'melee') {
+        if (dist > ty.meleeRange * 0.85) moveDir.copy(toTarget);
+      } else {
+        if (dist > ty.shootRange * 0.9) moveDir.copy(toTarget);
+        else if (dist < ty.keepDistance) moveDir.copy(toTarget).negate().addScaledVector(perp, 0.7);
+        else moveDir.copy(perp).multiplyScalar(0.8);
+      }
     }
 
     // separation from other enemies
@@ -223,22 +272,24 @@ class Enemy {
 
     // --- attacks ---
     this.attackCooldown -= dt;
-    if (t.attack === 'melee') {
-      const vDiff = Math.abs((player.position.y) - this.position.y);
-      if (dist < t.meleeRange && vDiff < 1.6 && this.attackCooldown <= 0 && player.alive &&
-          this._hasLineOfSight()) { // no clawing through crate corners
-        this.attackCooldown = t.meleeCooldown;
-        player.takeDamage(t.meleeDmg, this.position);
-        // lunge visual
-        this.armL.rotation.x = -1.6;
-        this.armR.rotation.x = -1.6;
-      }
-    } else if (dist < t.shootRange && this.attackCooldown <= 0 && player.alive) {
-      if (this._hasLineOfSight()) {
-        this.attackCooldown = t.shootCooldown * (0.85 + Math.random() * 0.3);
-        this.game.enemies.spawnProjectile(this);
-      } else {
-        this.attackCooldown = 0.4; // retry soon while repositioning
+    if (target) {
+      if (ty.attack === 'melee') {
+        const vDiff = Math.abs(target.position.y - this.position.y);
+        if (dist < ty.meleeRange && vDiff < 1.6 && this.attackCooldown <= 0 &&
+            this._hasLineOfSight(target)) { // no clawing through crate corners
+          this.attackCooldown = ty.meleeCooldown;
+          this._dealDamage(target, ty.meleeDmg);
+          // lunge visual
+          this.armL.rotation.x = -1.6;
+          this.armR.rotation.x = -1.6;
+        }
+      } else if (dist < ty.shootRange && this.attackCooldown <= 0) {
+        if (this._hasLineOfSight(target)) {
+          this.attackCooldown = ty.shootCooldown * (0.85 + Math.random() * 0.3);
+          this.game.enemies.spawnProjectile(this, target);
+        } else {
+          this.attackCooldown = 0.4; // retry soon while repositioning
+        }
       }
     }
 
@@ -251,8 +302,8 @@ class Enemy {
     this.armL.rotation.x += (swing * 0.5 - this.armL.rotation.x) * Math.min(1, dt * 8);
     this.armR.rotation.x += (-swing * 0.5 - this.armR.rotation.x) * Math.min(1, dt * 8);
 
-    // face the player
-    g.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+    // face the target
+    if (target) g.rotation.y = Math.atan2(toTarget.x, toTarget.z);
     g.position.copy(this.position);
 
     // hit flash
@@ -269,7 +320,7 @@ class Enemy {
 
     // health bar faces the camera
     const frac = Math.max(0, this.hp / this.maxHp);
-    this.bar.scale.x = frac;
+    this.bar.scale.x = Math.max(0.001, frac);
     this.bar.position.x = -(1 - frac) * 0.45;
     this.barMat.color.setHSL(frac * 0.33, 0.9, 0.55);
     const camPos = this.game.camera.position;
@@ -280,6 +331,14 @@ class Enemy {
     this.barBg.visible = barVisible;
 
     return true;
+  }
+
+  _dealDamage(target, dmg) {
+    if (target.isLocal) {
+      this.game.player.takeDamage(dmg, this.position);
+    } else {
+      this.game.mp.hostHurtPlayer(target.id, dmg, this.position);
+    }
   }
 
   _aabbOverlap(c) {
@@ -308,10 +367,12 @@ class Enemy {
     }
   }
 
-  _hasLineOfSight() {
+  _hasLineOfSight(target) {
     const from = new THREE.Vector3(
       this.position.x, this.position.y + 1.5 * this.type.scale, this.position.z);
-    const to = this.game.player.eyePosition;
+    const to = target.isLocal
+      ? this.game.player.eyePosition
+      : new THREE.Vector3(target.position.x, target.position.y + 1.55, target.position.z);
     const dir = to.clone().sub(from);
     const dist = dir.length();
     dir.normalize();
@@ -321,22 +382,24 @@ class Enemy {
     return hits.length === 0;
   }
 
-  takeDamage(dmg, point, headshot) {
+  // attackerId: undefined = the local player (solo / host shooting directly)
+  takeDamage(dmg, point, headshot, attackerId) {
     if (!this.alive) return;
-    if (this.game.cheats && this.game.cheats.flags.instantKill) dmg = this.hp;
+    if (this.game.cheats && this.game.cheats.is('instantKill')) dmg = this.hp;
     this.hp -= dmg;
     this.flashTime = 0.08;
     if (point) this.game.effects.enemyHitSparks(point);
-    this.game.audio.hit(headshot);
+    const localHit = attackerId === undefined;
+    if (localHit) this.game.audio.hit(headshot);
     if (this.hp <= 0) {
-      this.die();
-      this.game.hud.hitmarker(true);
-    } else {
+      this.die(attackerId);
+      if (localHit) this.game.hud.hitmarker(true);
+    } else if (localHit) {
       this.game.hud.hitmarker(false);
     }
   }
 
-  die() {
+  die(attackerId) {
     this.alive = false;
     this.dying = 0;
     this.bodyMat.transparent = true;
@@ -346,16 +409,20 @@ class Enemy {
       this.position.x, this.position.y + this.height * 0.55, this.position.z);
     this.game.effects.enemyDeathBurst(center, this.type.color);
     this.game.audio.kill();
-    this.game.addScore(this.type.score);
-    this.game.addKill(this.type.name);
-    this.game.pickups.maybeDrop(this.position);
+
+    const mp = this.game.mp;
+    if (mp && mp.active && mp.isHost) {
+      mp.hostEnemyKilled(this, attackerId);
+    } else {
+      this.game.addScore(this.type.score);
+      this.game.addKill(this.type.name);
+      this.game.pickups.maybeDrop(this.position);
+    }
   }
 
   dispose() {
     this.game.scene.remove(this.group);
-    this.bodyMat.dispose();
-    this.eyeMat.dispose();
-    this.barMat.dispose();
+    this.parts.dispose();
   }
 }
 
@@ -401,7 +468,7 @@ class Projectile {
         return false;
       }
 
-      // player collision (AABB expanded by projectile radius)
+      // local player collision (AABB expanded by projectile radius)
       const p = this.game.player;
       if (p.alive &&
         pos.x > p.position.x - 0.5 && pos.x < p.position.x + 0.5 &&
@@ -410,6 +477,23 @@ class Projectile {
       ) {
         p.takeDamage(this.dmg, pos);
         return false;
+      }
+
+      // co-op: the host also collides bolts with remote operatives
+      const mp = this.game.mp;
+      if (mp && mp.active && mp.isHost) {
+        for (const r of mp.remoteList()) {
+          if (!r.alive) continue;
+          if (
+            pos.x > r.position.x - 0.5 && pos.x < r.position.x + 0.5 &&
+            pos.y > r.position.y - 0.1 && pos.y < r.position.y + 1.9 &&
+            pos.z > r.position.z - 0.5 && pos.z < r.position.z + 0.5
+          ) {
+            mp.hostHurtPlayer(r.id, this.dmg, pos);
+            this.game.effects.burst(pos, 0xff6a2a, 6, 3, 0.3, 5);
+            return false;
+          }
+        }
       }
     }
 
@@ -432,18 +516,21 @@ export class EnemyManager {
   constructor(game) {
     this.game = game;
     this.list = [];
+    this.byId = new Map();
     this.projectiles = [];
     this.wave = 0;
     this.state = 'idle'; // idle | intermission | spawning | active
     this.timer = 0;
     this.spawnQueue = [];
     this.spawnTimer = 0;
+    this.nextEnemyId = 1;
   }
 
   reset() {
     for (const e of this.list) e.dispose();
     for (const p of this.projectiles) p.dispose();
     this.list = [];
+    this.byId.clear();
     this.projectiles = [];
     this.spawnQueue = [];
     this.wave = 0;
@@ -467,14 +554,17 @@ export class EnemyManager {
 
   _composition(wave) {
     const q = [];
-    const grunts = 3 + wave + Math.floor(wave / 3);
+    const playerCount = this.game.mp && this.game.mp.active
+      ? 1 + this.game.mp.remoteList().length : 1;
+    const mul = 1 + (playerCount - 1) * 0.6; // co-op scales wave size
+    const grunts = Math.round((3 + wave + Math.floor(wave / 3)) * mul);
     for (let i = 0; i < grunts; i++) q.push('grunt');
     if (wave >= 2) {
-      const rangers = 1 + Math.floor(wave / 2);
+      const rangers = Math.round((1 + Math.floor(wave / 2)) * mul);
       for (let i = 0; i < rangers; i++) q.push('ranger');
     }
     if (wave >= 4) {
-      const tanks = Math.floor((wave - 2) / 2);
+      const tanks = Math.round(Math.floor((wave - 2) / 2) * mul);
       for (let i = 0; i < tanks; i++) q.push('tank');
     }
     // shuffle
@@ -504,8 +594,10 @@ export class EnemyManager {
       speedMul: Math.min(1.35, 1 + (this.wave - 1) * 0.03),
     };
     this.game.hud.setWave(this.wave);
-    this.game.hud.banner(`WAVE ${this.wave}`, this.wave % 5 === 0 ? 'danger' : '');
+    this.game.hud.banner(t('banner.wave', { n: this.wave }), this.wave % 5 === 0 ? 'danger' : '');
     this.game.audio.waveStart();
+    const mp = this.game.mp;
+    if (mp && mp.active && mp.isHost) mp.hostWaveBegin(this.wave);
   }
 
   _spawnOne(typeName) {
@@ -519,8 +611,9 @@ export class EnemyManager {
     pos.x += (Math.random() - 0.5) * 3;
     pos.z += (Math.random() - 0.5) * 3;
     const type = ENEMY_TYPES[typeName];
-    const enemy = new Enemy(this.game, type, pos, this.mods);
+    const enemy = new Enemy(this.game, type, pos, this.mods, this.nextEnemyId++);
     this.list.push(enemy);
+    this.byId.set(enemy.id, enemy);
     this.game.effects.spawnPortal(pos, type.color);
   }
 
@@ -529,7 +622,7 @@ export class EnemyManager {
     if (this.state === 'intermission') {
       this.timer -= dt;
       const secs = Math.ceil(this.timer);
-      this.game.hud.subbanner(`NEXT WAVE IN ${secs}`);
+      this.game.hud.subbanner(t('banner.nextWave', { s: secs }));
       if (this.timer <= 0) {
         this.game.hud.subbanner('');
         this._beginWave();
@@ -545,10 +638,12 @@ export class EnemyManager {
       if (this.aliveCount() === 0) {
         this.game.addScore(this.wave * 50);
         this.game.audio.waveClear();
-        this.game.hud.banner('WAVE CLEAR', '');
+        this.game.hud.banner(t('banner.waveClear'), '');
         this.game.hud.bannerFadeSoon();
         this.state = 'intermission';
         this.timer = 5;
+        const mp = this.game.mp;
+        if (mp && mp.active && mp.isHost) mp.hostWaveClear();
       }
     }
 
@@ -556,6 +651,7 @@ export class EnemyManager {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i];
       if (!e.update(dt)) {
+        this.byId.delete(e.id);
         e.dispose();
         this.list.splice(i, 1);
       }
@@ -573,14 +669,16 @@ export class EnemyManager {
     this.game.hud.setEnemiesLeft(this.aliveCount() + this.spawnQueue.length);
   }
 
-  spawnProjectile(enemy) {
+  spawnProjectile(enemy, target) {
     const from = new THREE.Vector3(
       enemy.position.x,
       enemy.position.y + 1.45 * enemy.type.scale,
       enemy.position.z);
-    const target = this.game.player.eyePosition;
-    target.y -= 0.35; // aim at the chest
-    const dir = target.sub(from).normalize();
+    const aim = target && !target.isLocal
+      ? new THREE.Vector3(target.position.x, target.position.y + 1.2, target.position.z)
+      : this.game.player.eyePosition;
+    if (!target || target.isLocal) aim.y -= 0.35; // chest height
+    const dir = aim.sub(from).normalize();
     // slight inaccuracy
     dir.x += (Math.random() - 0.5) * 0.05;
     dir.y += (Math.random() - 0.5) * 0.05;

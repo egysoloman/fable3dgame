@@ -36,7 +36,7 @@ export class Progression {
 
   // effective rank: the Max Level cheat lifts everything to the cap
   get rank() {
-    if (this.game.cheats && this.game.cheats.flags.maxLevel) return MAX_RANK;
+    if (this.game.cheats && this.game.cheats.is('maxLevel')) return MAX_RANK;
     return this.realRank;
   }
 
@@ -63,7 +63,7 @@ export class Progression {
   }
 
   isUnlocked(def) {
-    if (this.game.cheats && this.game.cheats.flags.unlockAll) return true;
+    if (this.game.cheats && this.game.cheats.is('unlockAll')) return true;
     return (def.unlockRank || 1) <= this.rank;
   }
 
