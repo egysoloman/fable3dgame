@@ -89,8 +89,15 @@ Clicking **SOLO** opens mission setup:
   damage, refilled by ammo cells and resupply drops), **Combat Helmet**
   (-40% explosive / -25% gunfire damage), **Stim Injector** (faster
   regen), **Raider Boots** (+8% speed, higher jump).
-- **Vehicles** — walk up to a hoverbike and press `E` to ride: W/S
-  throttle, A/D steer, ram enemies at speed for kills.
+- **Vehicles** — press `E` next to any vehicle to board, `E` again to exit.
+  **Hoverbikes**: W/S throttle, A/D steer, ram enemies at speed.
+  **Battle tank** (600 hull): slow and enclosed — incoming damage hits the
+  hull, the turret tracks your camera, click lobs splash shells, and the
+  tracks crush anything you drive over. **Gunship helicopter** (350 hull):
+  W/S pitch, A/D turn, SPACE/CTRL altitude, click fires the chin gun
+  through your crosshair. Every vehicle has its own health pool, can be
+  destroyed (ejecting the rider), and respawns on its pad; positions and
+  destruction replicate in multiplayer.
 - **Weapon attachments** — five slots (optic, barrel, magazine, grip,
   muzzle), each with two options plus none, picked before deploying and
   saved locally. Every choice is a real stat trade-off applied across the
@@ -103,7 +110,7 @@ Clicking **SOLO** opens mission setup:
 | Streak | Reward |
 | --- | --- |
 | 5 | Resupply drop (ammo, grenade, armor plates) |
-| 7 | **AEGIS Railgun** — 5 piercing one-shot slugs on slot `0` |
+| 7 | **Orbital railgun** — press `0` for a top-down tactical view, steer the reticle with the mouse and click to call 3 railgun lances from orbit with heavy AOE splash |
 | 10 | Full ammo refill |
 | 12 | **Attack helicopter** escorts you for 30 s |
 | 15 / 20 | Big score bonuses |
@@ -139,7 +146,8 @@ Clicking **SOLO** opens mission setup:
 | 7 | **Spectre** | Bolt sniper, scope zoom, one-shot potential |
 | 8 | **Havoc RL** | Rocket launcher with splash damage |
 | 9 | **Volt Carbine** | 3-round burst rifle (rank 7) |
-| 0 | **Aegis Railgun** | Killstreak-only piercing cannon |
+
+Slot `0` calls the **orbital railgun strike** once the 7-killstreak is earned.
 
 Headshots deal double damage (2.5× on the Spectre).
 
@@ -228,9 +236,9 @@ cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: bot fill in online rooms, drivable helicopters/tanks, an
-expanded killstreak ladder (UAV, airstrike, care package), and
-skill-based matchmaking with parties.
+Next up: bot fill in online rooms, a desert map with panoramic skyboxes
+on every outdoor map, an expanded killstreak ladder (UAV, airstrike,
+care package), and skill-based matchmaking with parties.
 
 ## Tech notes
 

@@ -44,6 +44,7 @@ export class HUD {
       arsenal: document.getElementById('arsenal'),
       armorBar: document.getElementById('armor-bar'),
       mountHint: document.getElementById('mount-hint'),
+      vehicleHp: document.getElementById('vehicle-hp'),
     };
     this.game = null; // bound by Game after construction
     this.radarCtx = document.getElementById('radar').getContext('2d');
@@ -78,6 +79,14 @@ export class HUD {
 
   setMountHint(on) {
     this.el.mountHint.classList.toggle('visible', on);
+  }
+
+  setVehicleHp(v) {
+    const el = this.el.vehicleHp;
+    if (!v) { el.classList.remove('visible'); return; }
+    el.classList.add('visible');
+    el.textContent =
+      `${t(`vehicle.${v.type}`)} ${Math.max(0, Math.ceil(v.hp))}/${v.maxHp}`;
   }
 
   setHealth(hp, maxHp) {

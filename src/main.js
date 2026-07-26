@@ -13,7 +13,7 @@ import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
 import { DominationManager } from './domination.js';
 import { BotMatch, DIFFICULTY } from './bots.js';
-import { Warfare, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
+import { Warfare, OrbitalRailgun, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
 
 const BEST_KEY = 'neonstrike.best';
@@ -24,7 +24,7 @@ const CHEATS_ENABLED = new URLSearchParams(location.search).get('nocheats') !== 
 
 const STREAK_REWARDS = {
   5: { bonus: 250, resupply: true, key: 'streakr.resupply' },
-  7: { bonus: 400, railgun: true, key: 'streakr.railgun' },
+  7: { bonus: 400, orbital: true, key: 'streakr.railgun' },
   10: { bonus: 750, refill: true },
   12: { bonus: 1000, heli: true, key: 'streakr.heli' },
   15: { bonus: 2000, refill: true },
@@ -82,6 +82,7 @@ class Game {
     this.domination = new DominationManager(this);
     this.botMatch = new BotMatch(this);
     this.warfare = new Warfare(this);
+    this.orbital = new OrbitalRailgun(this);
     this.mode = 'survival';
     this.setup = { mode: 'survival', map: 'arena', difficulty: 'normal', equip: loadEquip() };
     try {
@@ -582,6 +583,7 @@ class Game {
     this.mode = this.setup.mode;
     this.world.load(this.setup.map);
     this.warfare.reset();
+    this.orbital.reset();
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
     this.matchDifficulty = this.setup.difficulty;
     this.enemies = this.mode === 'strike' ? this.soldiers
@@ -650,6 +652,7 @@ class Game {
     this.mode = mode;
     this.world.load(map);
     this.warfare.reset();
+    this.orbital.reset();
     this.soldiers.reset();
     if (mode === 'versus' || mp.isHost) {
       this.enemiesSolo.reset();
@@ -843,7 +846,7 @@ class Game {
           this.hud.setArmor(this.player.armor);
         }
       }
-      if (reward.railgun) this.weapons.grantRailgun();
+      if (reward.orbital) this.orbital.grant(3);
       if (reward.heli && !this.mp.active) this.warfare.callHelicopter();
       const label = reward.key ? t(reward.key) : t(`streak.${this.streak}`);
       this.hud.banner(`${label}  +${reward.bonus}`, 'streak');
@@ -931,6 +934,8 @@ class Game {
       this.pickups.update(gdt);
       this.effects.update(gdt);
       this.warfare.update(gdt);
+      this.orbital.update(gdt);
+      if (this.orbital.active) this.orbital.applyCamera();
       this.mp.update(dt);
       this.hud.updateRadar(this.player, this.enemies.list, this.pickups.list,
         this.mp.active ? this.mp.remoteList()

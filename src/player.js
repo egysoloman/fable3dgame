@@ -55,6 +55,10 @@ export class Player {
 
     document.addEventListener('mousemove', (e) => {
       if (!this.game.pointerLocked || !this.game.playing) return;
+      if (this.game.orbital && this.game.orbital.active) {
+        this.game.orbital.onMouse(e.movementX, e.movementY);
+        return;
+      }
       const ads = this.game.weapons ? this.game.weapons.adsAmount : 0;
       const sens = 0.0022 * this.game.settings.sensitivity * (1 - ads * 0.45);
       this.yaw -= e.movementX * sens;
@@ -106,6 +110,7 @@ export class Player {
 
   update(dt) {
     if (!this.alive || this.vehicle) return;
+    if (this.game.orbital && this.game.orbital.active) return; // aiming from orbit
 
     // --- input ---
     const fwd = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
@@ -280,6 +285,11 @@ export class Player {
 
   takeDamage(amount, sourcePos = null, dmgType = 'melee') {
     if (!this.alive || this.game.godMode) return;
+    // enclosed vehicles (tank, gunship) soak damage into their hull
+    if (this.vehicle && this.vehicle.enclosed && !this.vehicle.destroyed) {
+      this.vehicle.takeDamage(amount);
+      return;
+    }
     // COMBAT HELMET blunts explosions and incoming fire
     if (this.game.hasEquip && this.game.hasEquip('helmet')) {
       if (dmgType === 'splash') amount *= 0.6;

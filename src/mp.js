@@ -371,6 +371,10 @@ export class Multiplayer {
     this.relay({ k: 'bike', i, on: on ? 1 : 0 });
   }
 
+  sendVehKill(i) {
+    this.relay({ k: 'vehkill', i });
+  }
+
   // Accepts host, host:port, ws://.., wss://.., http://.., https://..;
   // scheme defaults to the page's security level, path defaults to /ws.
   resolveWsUrl(addr) {
@@ -548,6 +552,7 @@ export class Multiplayer {
       case 'ps': {
         const r = this.remotes.get(from);
         if (r) r.applyState(d);
+        game.warfare.applyRemoteVehicle(from, d.v || null);
         break;
       }
       case 'shot': {
@@ -608,6 +613,10 @@ export class Multiplayer {
       }
       case 'bike': {
         game.warfare.setRemoteBike(d.i, !!d.on);
+        break;
+      }
+      case 'vehkill': {
+        game.warfare.destroyRemote(d.i);
         break;
       }
       case 'pvpHit': {
@@ -807,12 +816,18 @@ export class Multiplayer {
     if (this.psAcc >= 1 / PSTATE_HZ) {
       this.psAcc = 0;
       const p = game.player;
-      this.relay({
+      const ps = {
         k: 'ps',
         x: +p.position.x.toFixed(2), y: +p.position.y.toFixed(2), z: +p.position.z.toFixed(2),
         yaw: +p.yaw.toFixed(2), c: +p.crouchAmount.toFixed(1),
         a: p.alive ? 1 : 0, hp: Math.round(p.hp),
-      });
+      };
+      if (p.vehicle) {
+        const v = p.vehicle;
+        ps.v = [v.index, +v.position.x.toFixed(1), +v.position.y.toFixed(1),
+          +v.position.z.toFixed(1), +v.yaw.toFixed(2)];
+      }
+      this.relay(ps);
     }
 
     // versus: self-managed respawn + shared end conditions

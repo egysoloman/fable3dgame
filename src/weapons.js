@@ -95,16 +95,6 @@ export const WEAPON_DEFS = [
     bodyColor: 0x2f4a4a, accentColor: 0x3affd8,
     barrelLen: 0.5, bodyLen: 0.34, thickness: 0.08, sight: true,
   },
-  {
-    id: 'railgun', unlockRank: 99, streakOnly: true, name: 'AEGIS RAILGUN', sound: 'sniper',
-    damage: 250, pellets: 1, fireDelay: 1.1, auto: false, pierce: true,
-    spreadHip: 0.002, spreadAds: 0.0004, bloom: 0,
-    magSize: 5, reserve: 0, reloadTime: 99,
-    recoil: 0.18, kick: 0.022, tracer: 0x62f0ff,
-    adsFov: 40, scope: false, moveMul: 0.88, headshotMul: 1.5,
-    bodyColor: 0x1e3448, accentColor: 0x62f0ff,
-    barrelLen: 0.85, bodyLen: 0.4, thickness: 0.1, sight: true, mag: true,
-  },
 ];
 
 const GRENADE = { fuse: 2.2, splashRadius: 5, splashDmg: 110, throwSpeed: 17, max: 5 };
@@ -383,11 +373,14 @@ export class WeaponSystem {
     this.grenadeCooldown = 0;
     this.burstQueue = 0;
     this.burstTimer = 0;
-    this.railgunActive = false;
 
     window.addEventListener('mousedown', (e) => {
       if (!this.game.playing || !this.game.pointerLocked) return;
       if (this.game.cheats && this.game.cheats.open) return;
+      if (this.game.orbital && this.game.orbital.active) {
+        if (e.button === 0) this.game.orbital.fire();
+        return;
+      }
       if (e.button === 0) {
         this.triggerHeld = true;
         this.tryFire();
@@ -405,8 +398,14 @@ export class WeaponSystem {
     window.addEventListener('keydown', (e) => {
       if (!this.game.playing) return;
       if (this.game.cheats && this.game.cheats.open) return;
+      if (e.code === 'Digit0') {
+        // orbital railgun tactical view (7-killstreak)
+        if (this.game.orbital) this.game.orbital.toggle();
+        return;
+      }
+      if (this.game.orbital && this.game.orbital.active) return;
       const digits = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7',
-        'Digit8', 'Digit9', 'Digit0'];
+        'Digit8', 'Digit9'];
       const di = digits.indexOf(e.code);
       if (di >= 0) this.switchTo(di);
       else if (e.code === 'KeyR') this.startReload();
@@ -457,25 +456,8 @@ export class WeaponSystem {
     return Math.max(18, this.current.def.adsFov * this.mods.adsFov);
   }
 
-  grantRailgun() {
-    const rg = this.weapons.find((w) => w.def.id === 'railgun');
-    rg.ammo = rg.def.magSize;
-    this.railgunActive = true;
-    this.switchTo(this.weapons.indexOf(rg));
-    this.updateHud();
-  }
-
-  _expireRailgun() {
-    this.railgunActive = false;
-    if (this.current.def.id === 'railgun') {
-      this.switchTo(2, true); // back to the AR
-    }
-    this.updateHud();
-  }
-
   reset() {
     for (const w of this.weapons) w.refill();
-    this.railgunActive = false;
     this.burstQueue = 0;
     for (const ex of this.explosives) ex.dispose();
     this.explosives = [];
@@ -684,10 +666,7 @@ export class WeaponSystem {
       this.burstQueue = w.def.burst - 1;
       this.burstTimer = w.def.burstDelay;
     }
-    if (w.ammo === 0) {
-      if (w.def.streakOnly) this._expireRailgun();
-      else this.startReload();
-    }
+    if (w.ammo === 0) this.startReload();
     this.updateHud();
   }
 

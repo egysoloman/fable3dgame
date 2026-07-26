@@ -63,9 +63,6 @@ export class Progression {
   }
 
   isUnlocked(def) {
-    if (def.streakOnly) {
-      return !!(this.game.weapons && this.game.weapons.railgunActive);
-    }
     if (this.game.cheats && this.game.cheats.is('unlockAll')) return true;
     return (def.unlockRank || 1) <= this.rank;
   }

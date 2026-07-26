@@ -107,7 +107,8 @@ export const MAPS = {
     ],
     playerSpawn: [0, 52],
     domPoints: [[-18, -18], [18, 18], [0, 0]],
-    vehicles: [[-6, 46, 0.5], [6, 46, -0.5]], // hoverbike pads: x, z, yaw
+    // vehicle pads: x, z, yaw, type ('bike' default)
+    vehicles: [[-6, 46, 0.5], [6, 46, -0.5], [-16, 40, 0, 'tank'], [16, 40, 3.14, 'heli']],
     build(w) {
       const rand = mulberry32(4242);
       const S = this.size;
@@ -225,7 +226,8 @@ export const MAPS = {
     ],
     playerSpawn: [0, 46],
     domPoints: [[0, -34], [-28, 10], [30, 18]],
-    vehicles: [[-8, 38, 0.4], [8, 38, -0.4]],
+    vehicles: [[-8, 38, 0.4], [8, 38, -0.4], [0, 26, 3.14, 'tank'],
+      [-32, -46, 0, 'heli'], [12, -46, 0, 'heli']],
     build(w) {
       const S = this.size;
       // "ocean" tint outside the deck happens via the dark outer plane; add
@@ -320,7 +322,8 @@ export class World {
     this.colliders = [];
     this.colliderMeshes = [];
     this.spawnPoints = [];
-    this.vehicleSpawns = map.vehicles.map(([x, z, yaw]) => ({ x, z, yaw }));
+    this.vehicleSpawns = map.vehicles.map(
+      ([x, z, yaw, type]) => ({ x, z, yaw, type: type || 'bike' }));
 
     // palette
     this.scene.background = new THREE.Color(map.bg);

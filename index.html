@@ -119,6 +119,12 @@
     text-shadow: 0 0 10px var(--warn); display: none;
   }
   #mount-hint.visible { display: block; }
+  #vehicle-hp {
+    position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%);
+    font-size: 14px; letter-spacing: 3px; color: #9dff6a;
+    text-shadow: 0 0 10px #9dff6a; display: none;
+  }
+  #vehicle-hp.visible { display: block; }
   .pick-row { display: flex; gap: 12px; margin: 8px 0 4px; flex-wrap: wrap; justify-content: center; }
   .pick {
     pointer-events: auto; cursor: pointer; font-family: inherit;
@@ -431,6 +437,7 @@
   <div id="subbanner"></div>
   <div id="spectate-note" data-i18n="mp.spectating"></div>
   <div id="mount-hint" data-i18n="vehicle.hint"></div>
+  <div id="vehicle-hp"></div>
 </div>
 
 <button id="lang-btn">繁體中文</button>
