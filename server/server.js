@@ -224,8 +224,11 @@ wss.on('connection', (ws) => {
         room.started = true;
         room.map = typeof msg.map === 'string' ? msg.map.slice(0, 20) : 'arena';
         room.mode = msg.mode === 'versus' ? 'versus' : 'survival';
+        room.difficulty = ['easy', 'normal', 'hard', 'expert'].includes(msg.difficulty)
+          ? msg.difficulty : 'normal';
         broadcastRoom(room, {
-          t: 'started', hostId: room.hostId, map: room.map, mode: room.mode });
+          t: 'started', hostId: room.hostId, map: room.map, mode: room.mode,
+          difficulty: room.difficulty });
         broadcastRoom(room, roomStatePayload(room));
         break;
       }

@@ -204,12 +204,20 @@ they can be destroyed (ejecting and injuring the rider) and respawn at
 their pad after 20 s; in multiplayer, a ridden bike is claimed across
 clients.
 
+## AI difficulty & bot players
+
+Mission setup (and the co-op lobby, host-controlled) offers **Easy /
+Normal / Hard / Expert** AI difficulty — it drives the soldiers' aim
+cone, reaction delay, burst cadence, grenade usage, and speed (and wave
+HP/speed in Survival; see [docs/AI.md](docs/AI.md)). **Versus** is now
+also playable solo: three bot players with real weapons, armor, regen,
+respawns, and scoreboard entries fill the FFA — first to 15 kills.
+
 ## Roadmap
 
-Requested and planned, in rough order: Domination/objective modes, more
-maps (space station, aircraft carrier), weapon attachments, drivable
-helicopters/tanks, AI that uses vehicles and AI teammates, Strike mode in
-multiplayer, larger rooms (>4 players), and matchmaking improvements.
+Next up: bot teams in Domination and online Versus fill, aircraft
+carrier map, weapon attachments, drivable helicopters/tanks, larger
+rooms (8+), and quick-play matchmaking.
 
 ## Tech notes
 

@@ -479,7 +479,7 @@ export class Multiplayer {
   joinRoom(code) { this.send({ t: 'join', code }); }
   leaveRoom() { this.send({ t: 'leave' }); }
   setReady(v) { this.send({ t: 'ready', v }); }
-  requestStart(map, mode) { this.send({ t: 'start', map, mode }); }
+  requestStart(map, mode, difficulty) { this.send({ t: 'start', map, mode, difficulty }); }
 
   inRoom() { return !!this.room; }
 
@@ -514,6 +514,7 @@ export class Multiplayer {
         game.ui.showMpBrowser();
         break;
       case 'started':
+        this.game.matchDifficulty = msg.difficulty || 'normal';
         this._startMatch(msg.hostId === this.myId, msg.map || 'arena', msg.mode || 'survival');
         break;
       case 'hostLeft':

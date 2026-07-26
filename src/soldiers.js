@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildEnemyBody } from './enemies.js';
 import { WEAPON_DEFS } from './weapons.js';
+import { DIFFICULTY } from './bots.js';
 import { t } from './i18n.js';
 
 // STRIKE mode: a squad of AI soldiers that fight with the normal weapon
@@ -41,10 +42,11 @@ class SoldierBot {
     this.weapon = WEAPON_DEFS.find((d) => d.id === pick);
     this.mag = this.weapon.magSize;
 
-    // aim model state
+    // aim model state (difficulty preset scales the whole model)
+    this.diff = DIFFICULTY[game.setup.difficulty] || DIFFICULTY.normal;
     this.hasLOS = false;
     this.losTimer = Math.random() * 0.15;  // staggered perception ticks
-    this.aimError = 0.14;                  // radians of cone error
+    this.aimError = this.diff.aimStart;    // radians of cone error
     this.acquireDelay = 0;                 // first-shot delay after acquiring
     this.lastSeen = pos.clone();
     this.lastSeenAge = 999;
@@ -99,13 +101,13 @@ class SoldierBot {
     if (seesNow) {
       if (!this.hasLOS) {
         // fresh acquisition: wide error + human reaction delay
-        this.aimError = 0.14;
-        this.acquireDelay = 0.35 + Math.random() * 0.2;
+        this.aimError = this.diff.aimStart;
+        this.acquireDelay = this.diff.react + Math.random() * 0.2;
       }
       this.lastSeen.copy(p.position);
       this.lastSeenAge = 0;
     } else if (this.hasLOS) {
-      this.aimError = 0.14; // lost sight: aim resets
+      this.aimError = this.diff.aimStart; // lost sight: aim resets
     }
     this.hasLOS = seesNow;
   }
@@ -205,7 +207,7 @@ class SoldierBot {
 
     // aim tightens with continuous time-on-target
     if (this.hasLOS) {
-      this.aimError = Math.max(0.025, this.aimError - 0.06 * dt);
+      this.aimError = Math.max(this.diff.aimFloor, this.aimError - this.diff.tighten * dt);
       if (this.acquireDelay > 0) this.acquireDelay -= dt;
     }
 

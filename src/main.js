@@ -12,6 +12,7 @@ import { CheatSystem } from './cheats.js';
 import { Multiplayer } from './mp.js';
 import { SoldierManager } from './soldiers.js';
 import { DominationManager } from './domination.js';
+import { BotMatch, DIFFICULTY } from './bots.js';
 import { Warfare, EQUIP_DEFS, loadEquip, saveEquip } from './warfare.js';
 import { t, setLang, getLang, nextLang, applyDom, LANG_LABELS } from './i18n.js';
 
@@ -79,14 +80,17 @@ class Game {
     this.mp = new Multiplayer(this);
     this.soldiers = new SoldierManager(this);
     this.domination = new DominationManager(this);
+    this.botMatch = new BotMatch(this);
     this.warfare = new Warfare(this);
     this.mode = 'survival';
-    this.setup = { mode: 'survival', map: 'arena', equip: loadEquip() };
+    this.setup = { mode: 'survival', map: 'arena', difficulty: 'normal', equip: loadEquip() };
     try {
       const st = JSON.parse(localStorage.getItem(SETUP_KEY) || '{}');
       if (st.mode) this.setup.mode = st.mode;
       if (st.map) this.setup.map = st.map;
+      if (DIFFICULTY[st.difficulty]) this.setup.difficulty = st.difficulty;
     } catch (e) { /* defaults */ }
+    this.matchDifficulty = 'normal';
     this.ui = this._buildUi();
 
     this.weapons.rig.visible = false;
@@ -236,7 +240,10 @@ class Game {
         ui.renderSetup();
       },
       renderSetup() {
-        for (const m of ['survival', 'strike', 'domination']) {
+        for (const d of Object.keys(DIFFICULTY)) {
+          $(`diff-${d}`).classList.toggle('sel', game.setup.difficulty === d);
+        }
+        for (const m of ['survival', 'strike', 'domination', 'versus']) {
           $(`mode-${m}`).classList.toggle('sel', game.setup.mode === m);
         }
         for (const m of ['arena', 'battlefield', 'station']) {
@@ -248,8 +255,9 @@ class Game {
       },
       saveSetup() {
         try {
-          localStorage.setItem(SETUP_KEY,
-            JSON.stringify({ mode: game.setup.mode, map: game.setup.map }));
+          localStorage.setItem(SETUP_KEY, JSON.stringify({
+            mode: game.setup.mode, map: game.setup.map,
+            difficulty: game.setup.difficulty }));
         } catch (e) { /* ok */ }
         saveEquip(game.setup.equip);
         ui.renderSetup();
@@ -329,6 +337,7 @@ class Game {
         $('lobby-map-row').style.display = amHost ? '' : 'none';
         $('lobby-map-btn').textContent = t(`map.${game.setup.map}`);
         $('lobby-mode-btn').textContent = t(`mode.${game.mpMode || 'survival'}`);
+        $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
         $('ready-btn').style.display = amHost ? 'none' : '';
         $('ready-btn').textContent = meReady ? t('mp.unready') : t('mp.ready');
         $('start-match-btn').style.display = amHost ? '' : 'none';
@@ -375,7 +384,7 @@ class Game {
     $('start-match-btn').addEventListener('click', () => {
       game.audio.init();
       game.applyVolume();
-      game.mp.requestStart(game.setup.map, game.mpMode || 'survival');
+      game.mp.requestStart(game.setup.map, game.mpMode || 'survival', game.setup.difficulty);
     });
     $('leave-lobby-btn').addEventListener('click', () => {
       game.mp.leaveRoom();
@@ -386,9 +395,21 @@ class Game {
       setLang(nextLang());
       ui.refreshText();
     });
-    for (const m of ['survival', 'strike', 'domination']) {
+    for (const m of ['survival', 'strike', 'domination', 'versus']) {
       $(`mode-${m}`).addEventListener('click', () => { game.setup.mode = m; ui.saveSetup(); });
     }
+    for (const d of Object.keys(DIFFICULTY)) {
+      $(`diff-${d}`).addEventListener('click', () => {
+        game.setup.difficulty = d;
+        ui.saveSetup();
+      });
+    }
+    $('lobby-diff-btn').addEventListener('click', () => {
+      const order = Object.keys(DIFFICULTY);
+      game.setup.difficulty = order[(order.indexOf(game.setup.difficulty) + 1) % order.length];
+      ui.saveSetup();
+      $('lobby-diff-btn').textContent = t(`diff.${game.setup.difficulty}`);
+    });
     for (const m of ['arena', 'battlefield', 'station']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
     }
@@ -544,14 +565,48 @@ class Game {
     this.world.load(this.setup.map);
     this.warfare.reset();
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
+    this.matchDifficulty = this.setup.difficulty;
     this.enemies = this.mode === 'strike' ? this.soldiers
-      : this.mode === 'domination' ? this.domination : this.enemiesSolo;
-    for (const mgr of [this.enemiesSolo, this.soldiers, this.domination]) {
+      : this.mode === 'domination' ? this.domination
+      : this.mode === 'versus' ? this.botMatch : this.enemiesSolo;
+    for (const mgr of [this.enemiesSolo, this.soldiers, this.domination, this.botMatch]) {
       if (mgr !== this.enemies) mgr.reset();
     }
     this._resetRunState();
     this.warfare.spawnVehicles();
     this.enemies.startGame();
+    if (this.mode === 'versus') {
+      this.hud.setWave('0/15');
+      this.hud.subbanner(t('versus.target', { n: 15 }));
+      setTimeout(() => { if (this.playing) this.hud.subbanner(''); }, 3000);
+    }
+  }
+
+  versusSoloFinished(won, scores) {
+    this.hud.subbanner('');
+    document.getElementById('spectate-note').classList.remove('visible');
+    document.querySelector('#mpover-screen h2').textContent =
+      t(won ? 'versus.win' : 'versus.lose');
+    const wrap = document.getElementById('mp-scores');
+    wrap.innerHTML = '';
+    const rows = [...scores.values()].sort((a, b) => b.kills - a.kills);
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 's-row';
+      row.innerHTML =
+        `<span class="grow">${r.name}</span>` +
+        `<span>${t('mp.kills')} <b>${r.kills}</b></span>` +
+        `<span>${t('mp.score')} <b>${r.score}</b></span>`;
+      wrap.appendChild(row);
+    }
+    // repurpose the lobby-return button as a menu return offline
+    this.state = 'gameover';
+    this.weapons.rig.visible = false;
+    this.hud.setScope(false);
+    this.hud.hide();
+    this.hud.screen('mpover');
+    this.ui.syncLangButton();
+    if (document.pointerLockElement) document.exitPointerLock();
   }
 
   strikeFinished(win, kills) {
@@ -696,6 +751,15 @@ class Game {
     }
     if (this.mode === 'strike' && !this.enemies.done) {
       // strike mode: redeploy instead of ending the run
+      this.enemies.onPlayerDeath();
+      return;
+    }
+    if (this.mode === 'versus' && !this.mp.active && !this.enemies.done) {
+      // offline FFA: credit the killer bot, then redeploy
+      if (this.player.lastBotAttacker) {
+        this.enemies.creditPlayerDeath(this.player.lastBotAttacker);
+        this.player.lastBotAttacker = null;
+      }
       this.enemies.onPlayerDeath();
       return;
     }

@@ -1,5 +1,31 @@
 # Soldier AI — algorithm reference
 
+## Difficulty presets
+
+`src/bots.js` exports the shared `DIFFICULTY` table used by both Strike
+soldiers and Versus bot players:
+
+| Preset | Aim start | Aim floor | Tighten rad/s | Reaction | Burst pause | Grenade p/f | Speed | HP |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Easy | 0.20 | 0.055 | 0.04 | 0.75 s | 1.3 s | 0.002 | 0.85× | 0.85× |
+| Normal | 0.14 | 0.030 | 0.06 | 0.45 s | 0.85 s | 0.004 | 0.95× | 1.0× |
+| Hard | 0.10 | 0.020 | 0.09 | 0.28 s | 0.55 s | 0.007 | 1.0× | 1.1× |
+| Expert | 0.07 | 0.012 | 0.13 | 0.16 s | 0.35 s | 0.010 | 1.05× | 1.2× |
+
+In co-op Survival the preset instead scales wave HP/speed. The host picks
+the room difficulty in the lobby; solo picks it in mission setup.
+
+## Versus bot players
+
+Offline Versus fills the match with **bot players** (`BotPlayer`) that play
+by player rules: real weapon definitions with magazines and reload times,
+armor plates that absorb before health, health regen after 4.5 s, grenade
+throws, respawns 3 s after death, kill/score tracking on the shared
+scoreboard, and a resupply at a 5-kill streak. They target the nearest
+visible combatant — the human or each other — using the same
+perception/aim pipeline described below.
+
+
 `src/soldiers.js` implements the armed AI soldiers used by **SQUAD STRIKE**
 mode. They fight with the regular weapon arsenal (SMG / AR / DMR / shotgun,
 assigned randomly at spawn) and are tuned to feel like human opponents

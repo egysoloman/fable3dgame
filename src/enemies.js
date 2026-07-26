@@ -591,9 +591,14 @@ export class EnemyManager {
     this.state = 'spawning';
     this.spawnQueue = this.spawnQueue.concat(this._composition(this.wave));
     this.spawnTimer = 0;
+    const DIFF_WAVE = {
+      easy: { hp: 0.8, sp: 0.92 }, normal: { hp: 1, sp: 1 },
+      hard: { hp: 1.2, sp: 1.07 }, expert: { hp: 1.45, sp: 1.14 },
+    };
+    const df = DIFF_WAVE[this.game.matchDifficulty] || DIFF_WAVE.normal;
     this.mods = {
-      hpMul: 1 + (this.wave - 1) * 0.06,
-      speedMul: Math.min(1.35, 1 + (this.wave - 1) * 0.03),
+      hpMul: (1 + (this.wave - 1) * 0.06) * df.hp,
+      speedMul: Math.min(1.5, (1 + (this.wave - 1) * 0.03) * df.sp),
     };
     this.game.hud.setWave(this.wave);
     this.game.hud.banner(t('banner.wave', { n: this.wave }), this.wave % 5 === 0 ? 'danger' : '');
