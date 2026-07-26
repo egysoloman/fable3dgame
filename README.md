@@ -9,6 +9,7 @@ and Traditional Chinese (Taiwan) — 支援繁體中文（台灣）介面.
 
 ![Gameplay](docs/screenshot.png)
 ![Battlefield](docs/battlefield.png)
+![Desert](docs/desert.png)
 
 ## Run the full game (server + multiplayer)
 
@@ -82,9 +83,16 @@ Clicking **SOLO** opens mission setup:
   soldiers who fight with the real weapon arsenal — burst discipline,
   tightening aim, cover use and reloads. The full AI algorithm is
   documented in [docs/AI.md](docs/AI.md).
-- **Maps** — the compact **Neon Arena** and the large dusk **Sector K
-  Battlefield** (bunkers, sandbag lines, watchtowers, a central hill, and
-  parked hoverbikes). The co-op host picks the map in the lobby.
+- **Maps** — the compact **Neon Arena**, the large dusk **Sector K
+  Battlefield** (bunkers, sandbag lines, watchtowers, a central hill),
+  the low-gravity **Helios Station**, the naval **CVN Tempest Carrier**,
+  and the open **Amber Wastes** desert (dune plateaus, rock spires, and
+  ancient ruins). Every outdoor map wraps a procedural 360° panoramic
+  skybox — starfield, Earth and nebulae over the station, ocean, cumulus
+  and sun around the carrier, hazy noon sky over the desert, and a
+  burning dusk over the battlefield — painted onto canvas at load, no
+  texture downloads. All maps support every mode; the co-op host picks
+  the map in the lobby.
 - **Equipment (pick 2)** — **Armor Plates** (blue armor pool absorbs
   damage, refilled by ammo cells and resupply drops), **Combat Helmet**
   (-40% explosive / -25% gunfire damage), **Stim Injector** (faster
@@ -236,9 +244,8 @@ cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: bot fill in online rooms, a desert map with panoramic skyboxes
-on every outdoor map, an expanded killstreak ladder (UAV, airstrike,
-care package), and skill-based matchmaking with parties.
+Next up: bot fill in online rooms, an expanded killstreak ladder (UAV,
+airstrike, care package), and skill-based matchmaking with parties.
 
 ## Tech notes
 

@@ -51,6 +51,177 @@ function makePanelTexture() {
 }
 
 // ---------------------------------------------------------------------------
+// Procedural 360° panoramic skyboxes: each painter fills an equirectangular
+// canvas that wraps a BackSide sphere. Painted once per map load.
+// ---------------------------------------------------------------------------
+function skyGradient(g, w, h, stops) {
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  for (const [at, color] of stops) grad.addColorStop(at, color);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, w, h);
+}
+
+function paintSun(g, x, y, r, core, glow) {
+  const halo = g.createRadialGradient(x, y, r * 0.3, x, y, r * 4);
+  halo.addColorStop(0, glow);
+  halo.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = halo;
+  g.fillRect(x - r * 4, y - r * 4, r * 8, r * 8);
+  g.fillStyle = core;
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fill();
+}
+
+function paintClouds(g, w, band, n, rand, alpha = 0.85) {
+  for (let i = 0; i < n; i++) {
+    const cx = rand() * w;
+    const cy = band[0] + rand() * (band[1] - band[0]);
+    const cw = 40 + rand() * 90;
+    const ch = 9 + rand() * 15;
+    g.fillStyle = `rgba(255,255,255,${(0.25 + rand() * 0.5) * alpha})`;
+    for (let b = 0; b < 5; b++) {
+      g.beginPath();
+      g.ellipse(cx + (rand() - 0.5) * cw, cy + (rand() - 0.5) * ch,
+        cw * (0.25 + rand() * 0.3), ch * (0.5 + rand() * 0.5), 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
+const SKY_PAINTERS = {
+  // deep space: starfield, nebulae, and Earth hanging near the horizon
+  space(g, w, h) {
+    const rand = mulberry32(31337);
+    skyGradient(g, w, h, [[0, '#01010a'], [0.5, '#050818'], [1, '#01010a']]);
+    for (let i = 0; i < 4; i++) { // faint nebulae
+      const nx = rand() * w, ny = rand() * h * 0.7;
+      const nr = 90 + rand() * 160;
+      const neb = g.createRadialGradient(nx, ny, 0, nx, ny, nr);
+      const hue = rand() < 0.5 ? '80,60,160' : '40,110,150';
+      neb.addColorStop(0, `rgba(${hue},0.16)`);
+      neb.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = neb;
+      g.fillRect(nx - nr, ny - nr, nr * 2, nr * 2);
+    }
+    for (let i = 0; i < 900; i++) { // stars
+      const sx = rand() * w, sy = rand() * h;
+      const sr = rand() < 0.94 ? rand() * 1.1 : 1.2 + rand() * 1.4;
+      g.fillStyle = `rgba(255,255,255,${0.35 + rand() * 0.65})`;
+      g.beginPath();
+      g.arc(sx, sy, sr, 0, Math.PI * 2);
+      g.fill();
+    }
+    // Earth: lit blue disc with cloud swirls and an atmosphere rim
+    const ex = w * 0.68, ey = h * 0.46, er = h * 0.20;
+    const atm = g.createRadialGradient(ex, ey, er * 0.9, ex, ey, er * 1.25);
+    atm.addColorStop(0, 'rgba(90,170,255,0.5)');
+    atm.addColorStop(1, 'rgba(90,170,255,0)');
+    g.fillStyle = atm;
+    g.fillRect(ex - er * 1.4, ey - er * 1.4, er * 2.8, er * 2.8);
+    const earth = g.createRadialGradient(
+      ex - er * 0.4, ey - er * 0.35, er * 0.1, ex, ey, er);
+    earth.addColorStop(0, '#6ab8ff');
+    earth.addColorStop(0.55, '#1e5fb0');
+    earth.addColorStop(1, '#06182e');
+    g.fillStyle = earth;
+    g.beginPath();
+    g.arc(ex, ey, er, 0, Math.PI * 2);
+    g.fill();
+    g.save(); // clouds + landmasses clipped to the disc
+    g.beginPath();
+    g.arc(ex, ey, er, 0, Math.PI * 2);
+    g.clip();
+    g.fillStyle = 'rgba(70,160,90,0.55)';
+    for (let i = 0; i < 7; i++) {
+      g.beginPath();
+      g.ellipse(ex + (rand() - 0.5) * er * 1.6, ey + (rand() - 0.5) * er * 1.6,
+        er * (0.12 + rand() * 0.2), er * (0.07 + rand() * 0.12),
+        rand() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < 10; i++) {
+      g.beginPath();
+      g.ellipse(ex + (rand() - 0.5) * er * 1.8, ey + (rand() - 0.5) * er * 1.8,
+        er * (0.2 + rand() * 0.25), er * (0.04 + rand() * 0.05),
+        rand() * Math.PI * 0.3, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  },
+
+  // open ocean: blue sky, cumulus, sun, and sea below the horizon
+  ocean(g, w, h) {
+    const rand = mulberry32(4444);
+    skyGradient(g, w, h, [
+      [0, '#1a4f9e'], [0.35, '#4f8ed0'], [0.5, '#bcd8ea'],
+      [0.505, '#0e3a5c'], [0.72, '#0a2a44'], [1, '#051826'],
+    ]);
+    paintSun(g, w * 0.3, h * 0.24, 26, '#fff8e0', 'rgba(255,244,200,0.55)');
+    paintClouds(g, w, [h * 0.18, h * 0.42], 16, rand);
+    // sea sparkle streaks + a crisp horizon line
+    g.fillStyle = 'rgba(180,220,255,0.14)';
+    for (let i = 0; i < 60; i++) {
+      const sy = h * (0.52 + rand() * 0.4);
+      g.fillRect(rand() * w, sy, 30 + rand() * 90, 1.5);
+    }
+    g.fillStyle = 'rgba(220,240,255,0.5)';
+    g.fillRect(0, h * 0.5 - 1, w, 2);
+  },
+
+  // desert noon: clear sky, blazing sun, hazy horizon, distant dunes
+  desert(g, w, h) {
+    const rand = mulberry32(9090);
+    skyGradient(g, w, h, [
+      [0, '#3f7fd0'], [0.3, '#7fb2e2'], [0.47, '#e8ddc2'], [0.5, '#d8c49a'],
+      [0.53, '#c2a878'], [1, '#8a6f45'],
+    ]);
+    paintSun(g, w * 0.62, h * 0.18, 30, '#fffbe8', 'rgba(255,246,214,0.6)');
+    // horizon haze band
+    const haze = g.createLinearGradient(0, h * 0.38, 0, h * 0.52);
+    haze.addColorStop(0, 'rgba(240,228,196,0)');
+    haze.addColorStop(1, 'rgba(240,228,196,0.85)');
+    g.fillStyle = haze;
+    g.fillRect(0, h * 0.38, w, h * 0.14);
+    // far dune silhouettes
+    for (const [band, tone] of [[0.485, 'rgba(170,140,92,0.7)'], [0.495, 'rgba(150,120,76,0.8)']]) {
+      g.fillStyle = tone;
+      g.beginPath();
+      g.moveTo(0, h * 0.5);
+      for (let x = 0; x <= w; x += 8) {
+        g.lineTo(x, h * (band + Math.sin(x * 0.011 + band * 90) * 0.006 +
+          Math.sin(x * 0.031) * 0.003));
+      }
+      g.lineTo(w, h * 0.52);
+      g.lineTo(0, h * 0.52);
+      g.fill();
+    }
+    paintClouds(g, w, [h * 0.1, h * 0.24], 5, rand, 0.4);
+  },
+
+  // battlefield dusk: burning gradient, low sun, streak clouds
+  dusk(g, w, h) {
+    const rand = mulberry32(2222);
+    skyGradient(g, w, h, [
+      [0, '#241a3e'], [0.3, '#63315a'], [0.44, '#c25a30'], [0.5, '#f0a04a'],
+      [0.52, '#3a2413'], [1, '#120c06'],
+    ]);
+    paintSun(g, w * 0.5, h * 0.465, 22, '#ffe8b0', 'rgba(255,170,90,0.6)');
+    // wind-sheared cloud streaks
+    for (let i = 0; i < 26; i++) {
+      const cy = h * (0.16 + rand() * 0.3);
+      g.fillStyle = `rgba(40,22,48,${0.25 + rand() * 0.35})`;
+      g.fillRect(rand() * w, cy, 80 + rand() * 220, 3 + rand() * 6);
+    }
+    for (let i = 0; i < 120; i++) { // early stars up high
+      g.fillStyle = `rgba(255,240,255,${0.2 + rand() * 0.4})`;
+      g.fillRect(rand() * w, rand() * h * 0.16, 1.4, 1.4);
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Map registry. Each map def builds its own geometry via build(world).
 // ---------------------------------------------------------------------------
 export const MAPS = {
@@ -96,6 +267,7 @@ export const MAPS = {
   battlefield: {
     id: 'battlefield',
     size: 140,
+    sky: 'dusk',
     fog: [0x120c06, 45, 220],
     bg: 0x120c06,
     hemi: [0x8a6a3a, 0x14100a, 0.85],
@@ -170,6 +342,7 @@ export const MAPS = {
   station: {
     id: 'station',
     size: 80,
+    sky: 'space',
     fog: [0x04060c, 22, 90],
     bg: 0x04060c,
     hemi: [0x9fb8d8, 0x0a0e18, 1.0],
@@ -216,9 +389,10 @@ export const MAPS = {
   carrier: {
     id: 'carrier',
     size: 120,
+    sky: 'ocean',
     fog: [0x0a1420, 40, 190],
     bg: 0x0a1420,
-    hemi: [0x7a9ab8, 0x0a1018, 1.0],
+    hemi: [0x9fc4e0, 0x2a3e50, 1.25],
     sun: [0xd8e8ff, 1.35],
     floorColors: ['#1c2228', '#2e3a44', '#8a97a8'],
     accents: [
@@ -268,6 +442,67 @@ export const MAPS = {
       w.addBox(44, 0.9, 30, 3, 1.8, 3, w.mats.container);
 
       w.spawnPoints = w.ringSpawns(12, S / 2 - 6);
+    },
+  },
+
+  desert: {
+    id: 'desert',
+    size: 150,
+    sky: 'desert',
+    fog: [0xd8c49a, 50, 240],
+    bg: 0xd8c49a,
+    hemi: [0xffe8c0, 0xa8895a, 1.45],
+    sun: [0xfff2d0, 1.7],
+    floorColors: ['#8a6f45', '#a8895a', '#c8a868'],
+    accents: [
+      [-55, 0xffcf3b, -55], [55, 0xff8a3b, 55], [0, 0xffe8a0, 0],
+    ],
+    playerSpawn: [0, 58],
+    domPoints: [[-30, 10], [30, -8], [0, -40]],
+    vehicles: [[-8, 50, 0.4], [8, 50, -0.4], [-18, 44, 0, 'tank'], [18, 44, 3.14, 'heli']],
+    build(w) {
+      const rand = mulberry32(7777);
+      // dune plateaus: broad, low, climbable stacked mounds
+      const dunes = [[-34, -30, 26], [30, 26, 30], [38, -38, 22], [-42, 30, 20]];
+      for (const [dx, dz, dw] of dunes) {
+        w.addBox(dx, 0.55, dz, dw, 1.1, dw * 0.8, w.mats.sand);
+        w.addBox(dx, 1.5, dz, dw * 0.62, 0.9, dw * 0.5, w.mats.sand);
+        w.addBox(dx, 2.3, dz, dw * 0.34, 0.7, dw * 0.28, w.mats.sand);
+      }
+      // rock formations: clustered angular spires, hard cover
+      const rocks = [[-8, -20], [16, 6], [-26, 14], [8, -46], [46, 4]];
+      for (const [rx, rz] of rocks) {
+        const n = 3 + Math.floor(rand() * 3);
+        for (let i = 0; i < n; i++) {
+          const ox = (rand() - 0.5) * 6, oz = (rand() - 0.5) * 6;
+          const hgt = 2 + rand() * 4.5;
+          const s = 1.2 + rand() * 2;
+          w.addBox(rx + ox, hgt / 2, rz + oz, s, hgt, s * (0.7 + rand() * 0.6), w.mats.rock);
+        }
+      }
+      // ruins: broken walls, a colonnade, and an arch gate
+      w.addBox(-14, 1.6, 34, 12, 3.2, 1, w.mats.ruin);
+      w.addBox(-8.5, 0.9, 30, 1, 1.8, 8, w.mats.ruin);
+      w.addBox(12, 1.1, 30, 8, 2.2, 1, w.mats.ruin);
+      for (let i = 0; i < 4; i++) {
+        w.addBox(-2 + i * 4, 1.9, -12, 1.1, 3.8, 1.1, w.mats.ruin);
+      }
+      w.addBox(4, 4.05, -12, 14, 0.5, 1.3, w.mats.ruin);
+      w.addBox(-30, 2.2, -8, 1.2, 4.4, 1.2, w.mats.ruin);
+      w.addBox(-24, 2.2, -8, 1.2, 4.4, 1.2, w.mats.ruin);
+      w.addBox(-27, 4.7, -8, 8, 0.6, 1.4, w.mats.ruin);
+      // scattered rubble, clear of spawn and vehicle pads
+      for (let i = 0; i < 18; i++) {
+        const x = (rand() - 0.5) * (this.size - 18);
+        const z = (rand() - 0.5) * (this.size - 18);
+        if (Math.hypot(x - this.playerSpawn[0], z - this.playerSpawn[1]) < 12) continue;
+        if (Math.hypot(x, z) < 10) continue;
+        if (this.vehicles.some(([vx, vz]) => Math.hypot(x - vx, z - vz) < 6)) continue;
+        const s2 = 1 + rand() * 1.8;
+        const h2 = 0.6 + rand() * 1.2;
+        w.addBox(x, h2 / 2, z, s2, h2, s2, rand() < 0.5 ? w.mats.ruin : w.mats.rock);
+      }
+      w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
     },
   },
 };
@@ -348,19 +583,43 @@ export class World {
       container: new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.7, metalness: 0.4 }),
       sandbag: new THREE.MeshStandardMaterial({ color: 0x5a5038, roughness: 1, metalness: 0 }),
       dirt: new THREE.MeshStandardMaterial({ color: 0x3a2f1c, roughness: 1, metalness: 0 }),
+      sand: new THREE.MeshStandardMaterial({ color: 0xb08d58, roughness: 1, metalness: 0 }),
+      rock: new THREE.MeshStandardMaterial({ color: 0x7a5f46, roughness: 0.95, metalness: 0.05 }),
+      ruin: new THREE.MeshStandardMaterial({ color: 0xa89272, roughness: 0.9, metalness: 0 }),
       trim: new THREE.MeshStandardMaterial({
         color: 0x27e8ff, emissive: 0x27e8ff, emissiveIntensity: 1.6, roughness: 0.4,
       }),
     };
-    if (map.id === 'battlefield') {
+    if (map.id === 'battlefield' || map.id === 'desert') {
       this.mats.trim.color.setHex(0xffb347);
       this.mats.trim.emissive.setHex(0xffb347);
     }
 
+    this._buildSky(map);
     this._buildFloor();
     this._buildWalls();
     this._buildAccents();
     map.build(this);
+  }
+
+  // 360° panoramic sky: an equirect canvas texture on an inside-out sphere
+  _buildSky(map) {
+    this.skyDome = null;
+    const painter = SKY_PAINTERS[map.sky];
+    if (!painter) return;
+    const c = document.createElement('canvas');
+    c.width = 1024;
+    c.height = 512;
+    painter(c.getContext('2d'), c.width, c.height);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const geo = new THREE.SphereGeometry(Math.max(map.size * 1.05, 90), 48, 24);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, side: THREE.BackSide, fog: false, depthWrite: false,
+    });
+    this.skyDome = new THREE.Mesh(geo, mat);
+    this.skyDome.renderOrder = -1;
+    this.root.add(this.skyDome);
   }
 
   ringSpawns(n, radius) {
@@ -421,13 +680,20 @@ export class World {
       { pos: [half, WALL_HEIGHT / 2, 0], size: [1, WALL_HEIGHT, size + 2] },
     ];
     for (const wl of walls) {
-      const tex = panelTex.clone();
-      tex.needsUpdate = true;
-      tex.repeat.set(Math.round(size / 4), 2);
-      const mat = new THREE.MeshStandardMaterial({
-        map: tex, color: 0x9fb4cc, roughness: 0.7, metalness: 0.4,
-      });
-      if (this.map.id === 'battlefield') mat.color.setHex(0xa89878);
+      let mat;
+      if (this.map.id === 'desert') {
+        // sandstone rampart — the dark panel texture would go black in daylight
+        mat = new THREE.MeshStandardMaterial({
+          color: 0xc0a070, roughness: 0.95, metalness: 0.05 });
+      } else {
+        const tex = panelTex.clone();
+        tex.needsUpdate = true;
+        tex.repeat.set(Math.round(size / 4), 2);
+        mat = new THREE.MeshStandardMaterial({
+          map: tex, color: 0x9fb4cc, roughness: 0.7, metalness: 0.4,
+        });
+        if (this.map.id === 'battlefield') mat.color.setHex(0xa89878);
+      }
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(...wl.size), mat);
       mesh.position.set(...wl.pos);
       mesh.castShadow = true;
