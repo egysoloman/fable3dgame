@@ -23,7 +23,7 @@ export class Player {
 
     this.position = new THREE.Vector3(0, 0, 10);  // feet position
     this.velocity = new THREE.Vector3();
-    this.yaw = Math.PI;   // face the arena center
+    this.yaw = 0;   // spawn at (0,0,10) facing -Z, toward the arena center
     this.pitch = 0;
     this.grounded = false;
     this.wasGrounded = false;
@@ -69,7 +69,7 @@ export class Player {
   reset() {
     this.position.set(0, 0, 10);
     this.velocity.set(0, 0, 0);
-    this.yaw = Math.PI;
+    this.yaw = 0;
     this.pitch = 0;
     this.maxHp = this.game.progression ? this.game.progression.maxHp() : MAX_HP;
     this.hp = this.maxHp;
