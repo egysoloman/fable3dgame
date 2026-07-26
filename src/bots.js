@@ -152,6 +152,10 @@ export class BotPlayer {
     const dist = dir.length();
     if (dist > 55) return false;
     dir.normalize();
+    if (this.game.smokeBlocksLos &&
+        this.game.smokeBlocksLos(from, from.clone().addScaledVector(dir, dist))) {
+      return false;
+    }
     _ray.set(from.clone(), dir);
     _ray.far = dist;
     return _ray.intersectObjects(this.game.world.colliderMeshes, false).length === 0;
@@ -254,6 +258,13 @@ export class BotPlayer {
     }
     g.scale.setScalar(1);
 
+    // flashbang stun: no perception, no shooting, no moving
+    if (this.stunned > 0) {
+      this.stunned -= dt;
+      g.rotation.y += Math.sin(this.stunned * 28) * dt * 1.6;
+      return true;
+    }
+
     // player-rule regen
     this.timeSinceDamage += dt;
     if (this.timeSinceDamage > 4.5 && this.hp < this.maxHp) {
@@ -321,6 +332,7 @@ export class BotPlayer {
     this.velocity.x = move.x * speed;
     this.velocity.z = move.z * speed;
     this.velocity.y -= GRAVITY * (this.game.world.map.gravityMul || 1) * dt;
+    const px0 = this.position.x, pz0 = this.position.z;
     this._moveAxis('x', this.velocity.x * dt);
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
@@ -329,6 +341,10 @@ export class BotPlayer {
     const lim = this.game.world.half - 1;
     this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
     this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
+    if (!this.game.world.groundAt(this.position.x, this.position.z)) {
+      this.position.x = px0;
+      this.position.z = pz0;
+    }
     g.position.copy(this.position);
 
     // weapon handling: real magazines, reloads, burst discipline

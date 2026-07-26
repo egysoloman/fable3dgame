@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
-import { WeaponSystem, ATTACHMENTS } from './weapons.js';
+import { WeaponSystem, ATTACHMENTS, WEAPON_DEFS, THROWABLES, DEFAULT_LOADOUT,
+  saveLoadout, loadPresets, savePresets } from './weapons.js';
 import { EnemyManager } from './enemies.js';
 import { PickupManager } from './pickups.js';
 import { Effects } from './effects.js';
@@ -83,6 +84,7 @@ class Game {
     this.botMatch = new BotMatch(this);
     this.warfare = new Warfare(this);
     this.orbital = new OrbitalRailgun(this);
+    this.smokes = [];
     this.mode = 'survival';
     this.setup = { mode: 'survival', map: 'arena', difficulty: 'normal', equip: loadEquip() };
     try {
@@ -208,6 +210,9 @@ class Game {
         game.hud.setRank(game.progression.rankLabel);
         game.cheats._render();
         ui.syncLangButton();
+        if (document.getElementById('loadout-screen').classList.contains('visible')) {
+          ui.renderLoadout();
+        }
       },
       showMenu() {
         game.state = 'menu';
@@ -240,6 +245,127 @@ class Game {
         game.hud.screen('setup');
         ui.renderSetup();
       },
+      showLoadout(returnTo) {
+        ui._loadoutReturn = returnTo || 'menu';
+        game.hud.screen('loadout');
+        ui.renderSetup();       // attach/equip pickers live on this screen
+        ui.renderLoadout();
+      },
+      loadoutSummary() {
+        const l = game.weapons.loadout;
+        return `${t(`weapon.${l.primary}`)} · ${t(`weapon.${l.secondary}`)} · ` +
+          t(`throw.${l.throwable}`);
+      },
+      renderLoadout() {
+        const w = game.weapons;
+        const cats = [
+          ['primary', WEAPON_DEFS.filter((d) => d.cat === 'primary')],
+          ['secondary', WEAPON_DEFS.filter((d) => d.cat === 'secondary')],
+          ['throwable', Object.values(THROWABLES)],
+        ];
+        for (const [cat, defs] of cats) {
+          const list = $(`lo-${cat}`);
+          list.innerHTML = '';
+          for (const def of defs) {
+            const row = document.createElement('button');
+            row.className = 'lo-row';
+            const isThrow = cat === 'throwable';
+            const locked = !isThrow && !game.progression.isUnlocked(def);
+            if (w.loadout[cat] === def.id) row.classList.add('sel');
+            if (locked) row.classList.add('locked');
+            const name = document.createElement('span');
+            name.textContent = isThrow ? t(`throw.${def.id}`) : t(`weapon.${def.id}`);
+            const cls = document.createElement('span');
+            cls.className = 'cls';
+            cls.textContent = locked
+              ? t('loadout.locked', { n: def.unlockRank })
+              : (isThrow ? t(`throw.${def.id}.d`) : t(`wclass.${def.wclass}`));
+            row.append(name, cls);
+            row.addEventListener('click', () => {
+              if (locked) { game.audio.empty(); return; }
+              w.setLoadoutItem(cat, def.id);
+              ui.renderLoadout();
+            });
+            row.addEventListener('mouseenter', () => ui.renderLoStats(cat, def));
+            list.appendChild(row);
+          }
+        }
+        ui.renderLoStats('primary',
+          WEAPON_DEFS.find((d) => d.id === w.loadout.primary));
+        ui.renderPresets();
+        $('setup-loadout-sum').textContent = ui.loadoutSummary();
+      },
+      loStatSpec(def) {
+        return [
+          ['stat.dmg', Math.min(1, (def.damage * def.pellets) / 70)],
+          ['stat.rof', Math.min(1, (1 / def.fireDelay) / 16)],
+          ['stat.acc', Math.max(0.05, 1 - def.spreadHip * 26)],
+          ['stat.rng', Math.max(0.05, 1 - def.spreadAds * 55)],
+          ['stat.mob', Math.min(1, Math.max(0.05, (def.moveMul - 0.75) / 0.25))],
+        ];
+      },
+      // stats panel: bars for the hovered def, deltas vs the selected one
+      renderLoStats(cat, def) {
+        if (!def) return;
+        const box = $('lo-stats');
+        box.innerHTML = '';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'name';
+        const isThrow = cat === 'throwable';
+        nameEl.textContent = isThrow ? t(`throw.${def.id}`) : t(`weapon.${def.id}`);
+        box.appendChild(nameEl);
+        if (isThrow) {
+          const text = document.createElement('div');
+          text.className = 'lo-text';
+          text.textContent = `${t('stat.dmg')} ${def.splashDmg} · ` +
+            `${t('stat.radius')} ${def.splashRadius}m · ${t('stat.count')} ${def.max}`;
+          const desc = document.createElement('div');
+          desc.className = 'lo-text';
+          desc.textContent = t(`throw.${def.id}.d`);
+          box.append(text, desc);
+          return;
+        }
+        const selDef = WEAPON_DEFS.find((x) => x.id === game.weapons.loadout[cat]);
+        const base = selDef && selDef.id !== def.id ? ui.loStatSpec(selDef) : null;
+        ui.loStatSpec(def).forEach(([key, v], i) => {
+          const row = document.createElement('div');
+          row.className = 'lo-stat';
+          const lbl = document.createElement('span');
+          lbl.className = 'lbl';
+          lbl.textContent = t(key);
+          const bar = document.createElement('div');
+          bar.className = 'bar';
+          const fill = document.createElement('div');
+          fill.className = 'fill';
+          fill.style.width = `${Math.round(v * 100)}%`;
+          bar.appendChild(fill);
+          row.append(lbl, bar);
+          if (base) {
+            const dv = v - base[i][1];
+            const delta = document.createElement('span');
+            delta.className = `delta ${dv >= 0.005 ? 'up' : dv <= -0.005 ? 'down' : ''}`;
+            delta.textContent = Math.abs(dv) < 0.005
+              ? '=' : `${dv > 0 ? '+' : ''}${Math.round(dv * 100)}`;
+            row.appendChild(delta);
+          }
+          box.appendChild(row);
+        });
+        const text = document.createElement('div');
+        text.className = 'lo-text';
+        text.textContent = `${t('stat.mag')} ${def.magSize} · ` +
+          `${t('stat.reload')} ${def.reloadTime}s · ` +
+          `${t('stat.reserve')} ${def.reserve === Infinity ? '∞' : def.reserve}`;
+        box.appendChild(text);
+      },
+      renderPresets() {
+        const presets = loadPresets();
+        for (let i = 0; i < 3; i++) {
+          $(`preset-save-${i}`).textContent = t('loadout.save', { n: i + 1 });
+          const btn = $(`preset-load-${i}`);
+          btn.textContent = presets[i] ? t('loadout.load', { n: i + 1 }) : `· ${i + 1} ·`;
+          btn.disabled = !presets[i];
+        }
+      },
       renderSetup() {
         for (const d of Object.keys(DIFFICULTY)) {
           $(`diff-${d}`).classList.toggle('sel', game.setup.difficulty === d);
@@ -250,6 +376,7 @@ class Game {
         for (const m of ['arena', 'battlefield', 'station', 'carrier', 'desert', 'rooftop']) {
           $(`map-${m}`).classList.toggle('sel', game.setup.map === m);
         }
+        $('setup-loadout-sum').textContent = ui.loadoutSummary();
         for (const eq of EQUIP_DEFS) {
           $(`eq-${eq}`).classList.toggle('sel', game.setup.equip.includes(eq));
         }
@@ -356,6 +483,49 @@ class Game {
     $('mp-btn').addEventListener('click', () => {
       game.audio.init();
       ui.openMultiplayer();
+    });
+    $('loadout-btn').addEventListener('click', () => {
+      game.audio.init();
+      ui.showLoadout('menu');
+    });
+    $('setup-loadout-sum').addEventListener('click', () => ui.showLoadout('setup'));
+    $('loadout-back-btn').addEventListener('click', () => {
+      if (ui._loadoutReturn === 'setup') ui.showSetup();
+      else ui.showMenu();
+    });
+    for (let i = 0; i < 3; i++) {
+      $(`preset-save-${i}`).addEventListener('click', () => {
+        const presets = loadPresets();
+        presets[i] = {
+          loadout: { ...game.weapons.loadout },
+          attachments: { ...game.weapons.attachments },
+          equip: [...game.setup.equip],
+        };
+        savePresets(presets);
+        ui.renderLoadout();
+      });
+      $(`preset-load-${i}`).addEventListener('click', () => {
+        const pr = loadPresets()[i];
+        if (!pr) return;
+        game.weapons.loadout = { ...DEFAULT_LOADOUT, ...(pr.loadout || {}) };
+        saveLoadout(game.weapons.loadout);
+        game.weapons.applyLoadout(true);
+        for (const slot of Object.keys(ATTACHMENTS)) {
+          game.weapons.setAttachment(slot, (pr.attachments || {})[slot] || 'none');
+        }
+        game.setup.equip = (pr.equip || []).slice(0, 2);
+        ui.saveSetup();
+        ui.renderLoadout();
+      });
+    }
+    $('loadout-default').addEventListener('click', () => {
+      game.weapons.loadout = { ...DEFAULT_LOADOUT };
+      saveLoadout(game.weapons.loadout);
+      game.weapons.applyLoadout(true);
+      for (const slot of Object.keys(ATTACHMENTS)) game.weapons.setAttachment(slot, 'none');
+      game.setup.equip = ['plates', 'helmet'];
+      ui.saveSetup();
+      ui.renderLoadout();
     });
     $('mp-back-btn').addEventListener('click', () => {
       if (game.mp.inRoom()) game.mp.leaveRoom();
@@ -584,6 +754,7 @@ class Game {
     this.world.load(this.setup.map);
     this.warfare.reset();
     this.orbital.reset();
+    this._updateSmokes(9999);
     document.querySelector('#gameover-screen h1').textContent = t('over.title');
     this.matchDifficulty = this.setup.difficulty;
     this.enemies = this.mode === 'strike' ? this.soldiers
@@ -653,6 +824,7 @@ class Game {
     this.world.load(map);
     this.warfare.reset();
     this.orbital.reset();
+    this._updateSmokes(9999);
     this.soldiers.reset();
     if (mode === 'versus' || mp.isHost) {
       this.enemiesSolo.reset();
@@ -921,6 +1093,78 @@ class Game {
     }
   }
 
+  // Flashbang: blinds the player (screen whiteout) and stuns AI in LOS.
+  applyFlash(pos, radius) {
+    this.effects.explosion(pos);
+    this.audio.explosion();
+    if (this.mp.active) this.mp.sendBoom(pos);
+    const origin = pos.clone();
+    origin.y += 0.4;
+    for (const e of this.enemies.list) {
+      if (!e.alive || e.spawnTimer > 0) continue;
+      const c = new THREE.Vector3(
+        e.position.x, e.position.y + (e.height || 1.5) * 0.5, e.position.z);
+      if (c.distanceTo(pos) < radius && !this._splashBlocked(origin, c)) {
+        e.stunned = Math.max(e.stunned || 0, 3);
+      }
+    }
+    const p = this.player;
+    const d = p.eyePosition.distanceTo(pos);
+    if (p.alive && d < radius * 1.3 && !this._splashBlocked(origin, p.eyePosition)) {
+      const dir = pos.clone().sub(p.eyePosition).normalize();
+      const facing = this.camera.getWorldDirection(new THREE.Vector3()).dot(dir);
+      const k = Math.max(0.3, 1 - d / (radius * 1.3)) * (facing > 0.1 ? 1 : 0.45);
+      this.hud.flashBang(k);
+    }
+  }
+
+  // Smoke screen: a sphere that blocks AI line of sight for its lifetime.
+  applySmoke(pos, duration) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x9aa4b0, transparent: true, opacity: 0.42, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat);
+    const at = pos.clone();
+    at.y = Math.max(1.5, at.y + 1);
+    mesh.position.copy(at);
+    mesh.scale.setScalar(0.1);
+    this.scene.add(mesh);
+    this.smokes.push({ pos: at, r: 4.4, t: duration, total: duration, mesh, mat });
+    this.audio.grenadeThrow();
+  }
+
+  smokeBlocksLos(a, b) {
+    for (const s of this.smokes) {
+      // closest point on segment ab to the smoke center
+      const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+      const len2 = abx * abx + aby * aby + abz * abz;
+      if (len2 === 0) continue;
+      let tt = ((s.pos.x - a.x) * abx + (s.pos.y - a.y) * aby + (s.pos.z - a.z) * abz) / len2;
+      tt = Math.max(0, Math.min(1, tt));
+      const dx = a.x + abx * tt - s.pos.x;
+      const dy = a.y + aby * tt - s.pos.y;
+      const dz = a.z + abz * tt - s.pos.z;
+      if (dx * dx + dy * dy + dz * dz < s.r * s.r) return true;
+    }
+    return false;
+  }
+
+  _updateSmokes(dt) {
+    for (let i = this.smokes.length - 1; i >= 0; i--) {
+      const s = this.smokes[i];
+      s.t -= dt;
+      const grow = Math.min(1, (s.total - s.t) / 0.6);
+      s.mesh.scale.setScalar(Math.max(0.1, s.r * grow));
+      s.mat.opacity = 0.42 * Math.min(1, Math.max(0, s.t / 1.5));
+      s.mesh.rotation.y += dt * 0.3;
+      if (s.t <= 0) {
+        this.scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        s.mat.dispose();
+        this.smokes.splice(i, 1);
+      }
+    }
+  }
+
   loop() {
     requestAnimationFrame(this.loop);
     const dt = Math.min(0.05, this.clock.getDelta());
@@ -934,6 +1178,7 @@ class Game {
       this.pickups.update(gdt);
       this.effects.update(gdt);
       this.warfare.update(gdt);
+      this._updateSmokes(gdt);
       this.orbital.update(gdt);
       if (this.orbital.active) this.orbital.applyCamera();
       this.mp.update(dt);

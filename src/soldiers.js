@@ -96,7 +96,10 @@ class SoldierBot {
     dir.normalize();
     _ray.set(from.clone(), dir);
     _ray.far = dist;
-    const blocked = _ray.intersectObjects(this.game.world.colliderMeshes, false).length > 0;
+    const smoked = this.game.smokeBlocksLos &&
+      this.game.smokeBlocksLos(from, to);
+    const blocked = smoked ||
+      _ray.intersectObjects(this.game.world.colliderMeshes, false).length > 0;
     const seesNow = !blocked && dist < 60;
     if (seesNow) {
       if (!this.hasLOS) {
@@ -202,6 +205,13 @@ class SoldierBot {
     }
     g.scale.setScalar(1);
 
+    // flashbang stun
+    if (this.stunned > 0) {
+      this.stunned -= dt;
+      g.rotation.y += Math.sin(this.stunned * 28) * dt * 1.6;
+      return true;
+    }
+
     const p = this.game.player;
     this._perceive(dt);
 
@@ -271,6 +281,7 @@ class SoldierBot {
     this.velocity.x = move.x * speed;
     this.velocity.z = move.z * speed;
     this.velocity.y -= GRAVITY * dt;
+    const px0 = this.position.x, pz0 = this.position.z;
     this._moveAxis('x', this.velocity.x * dt);
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
@@ -278,6 +289,10 @@ class SoldierBot {
     const edgeLim = this.game.world.half - 1;
     this.position.x = Math.max(-edgeLim, Math.min(edgeLim, this.position.x));
     this.position.z = Math.max(-edgeLim, Math.min(edgeLim, this.position.z));
+    if (!this.game.world.groundAt(this.position.x, this.position.z)) {
+      this.position.x = px0;
+      this.position.z = pz0;
+    }
 
     // --- weapon handling ---
     if (this.reloadTimer > 0) {

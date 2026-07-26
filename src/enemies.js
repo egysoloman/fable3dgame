@@ -189,6 +189,13 @@ class Enemy {
     }
     g.scale.setScalar(this.type.scale);
 
+    // flashbang stun: frozen, no attacks
+    if (this.stunned > 0) {
+      this.stunned -= dt;
+      g.rotation.y += Math.sin(this.stunned * 30) * dt * 2;
+      return true;
+    }
+
     let target = this._pickTarget();
     const toTarget = new THREE.Vector3();
     let dist = 999;
@@ -250,6 +257,7 @@ class Enemy {
     this.velocity.z = moveDir.z * this.speed;
     this.velocity.y -= GRAVITY * dt;
 
+    const px0 = this.position.x, pz0 = this.position.z;
     this._moveAxis('x', this.velocity.x * dt);
     this._moveAxis('z', this.velocity.z * dt);
     this._moveAxis('y', this.velocity.y * dt);
@@ -261,6 +269,10 @@ class Enemy {
     const edgeLim = this.game.world.half - 1;
     this.position.x = Math.max(-edgeLim, Math.min(edgeLim, this.position.x));
     this.position.z = Math.max(-edgeLim, Math.min(edgeLim, this.position.z));
+    if (!this.game.world.groundAt(this.position.x, this.position.z)) {
+      this.position.x = px0;
+      this.position.z = pz0;
+    }
 
     // stuck detection
     const wanted = this.speed * dt;
@@ -384,6 +396,9 @@ class Enemy {
     dir.normalize();
     _losRay.set(from, dir);
     _losRay.far = dist;
+    if (this.game.smokeBlocksLos && this.game.smokeBlocksLos(from, from.clone().addScaledVector(dir, dist))) {
+      return false;
+    }
     const hits = _losRay.intersectObjects(this.game.world.colliderMeshes, false);
     return hits.length === 0;
   }

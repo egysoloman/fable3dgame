@@ -11,6 +11,7 @@ and Traditional Chinese (Taiwan) — 支援繁體中文（台灣）介面.
 ![Battlefield](docs/battlefield.png)
 ![Desert](docs/desert.png)
 ![Rooftop](docs/rooftop.png)
+![Carrier](docs/carrier.png)
 
 ## Run the full game (server + multiplayer)
 
@@ -88,22 +89,25 @@ Clicking **SOLO** opens mission setup:
   Battlefield** (bunkers, sandbag lines, watchtowers, a central hill),
   the low-gravity **Helios Station**, the naval **CVN Tempest Carrier**,
   the open **Amber Wastes** desert (dune plateaus, rock spires, ancient
-  ruins), and the two-layer **Apex Rooftop** — a skyscraper summit with
-  a walkable penthouse roof deck over glass-walled rooms, antenna masts,
-  a helipad, and crate stairs between layers. Every outdoor map wraps a
-  procedural 360° panoramic skybox — starfield, Earth and nebulae over
-  the station, ocean, cumulus and sun around the carrier, hazy noon sky
-  over the desert, a burning dusk over the battlefield, and rings of
-  lit high-rises over a cloud sea around the rooftop — painted onto
-  canvas at load, no texture downloads. All maps support every mode;
-  the co-op host picks the map in the lobby.
+  ruins), and the two-layer **Apex Rooftop** — a skyscraper summit at
+  night with a walkable penthouse roof deck over glass-walled rooms,
+  antenna masts, a helipad, crate stairs between layers, and a
+  surrounding city of **real low-poly tower models** with lit windows
+  rising out of the cloud sea. Every outdoor map wraps a procedural
+  360° panoramic skybox — starfield, Earth and nebulae over the
+  station, ocean, cumulus and sun around the carrier, hazy noon sky
+  over the desert, a burning dusk over the battlefield, and a starry
+  night above the rooftop — painted onto canvas at load, no texture
+  downloads. All maps support every mode; the co-op host picks the map
+  in the lobby.
 - **Open edges** — not every map is walled. The carrier deck and the
   rooftop have real edges: step off and you fall to your death (the
   ocean, or the streets far below). The desert has no walls at all —
   leaving the mission area starts a 5-second return countdown before
-  you're gone. The carrier's bridge tower is a full multi-level climb
-  with observation decks, a radar mast, and sniping positions over the
-  flight deck.
+  you're gone. The carrier is a true **warship-shaped hull** — long
+  deck, tapered bow, chamfered stern — with a multi-level bridge
+  tower to climb: observation decks, a radar mast, and sniping
+  positions over the flight deck. AI never wanders off the hull.
 - **Equipment (pick 2)** — **Armor Plates** (blue armor pool absorbs
   damage, refilled by ammo cells and resupply drops), **Combat Helmet**
   (-40% explosive / -25% gunfire damage), **Stim Injector** (faster
@@ -152,23 +156,32 @@ Clicking **SOLO** opens mission setup:
 - **Frag grenades** — cooked physics: they arc, bounce, and detonate with
   falloff splash damage that also hurts you.
 
-## Arsenal
+## Loadout & arsenal
 
-| Slot | Weapon | Role |
-| --- | --- | --- |
-| 1 | **P-9 Sidearm** | Semi-auto pistol, infinite reserve |
-| 2 | **Viper SMG** | 800 RPM hose, full mobility |
-| 3 | **Helix AR** | Full-auto all-rounder |
-| 4 | **Judge DMR** | Hard-hitting semi-auto marksman rifle |
-| 5 | **Breacher** | 8-pellet pump shotgun |
-| 6 | **Bastion LMG** | 75-round belt, slow reload, heavy |
-| 7 | **Spectre** | Bolt sniper, scope zoom, one-shot potential |
-| 8 | **Havoc RL** | Rocket launcher with splash damage |
-| 9 | **Volt Carbine** | 3-round burst rifle (rank 7) |
+The **LOADOUT** screen (from the menu or mission setup) is a full
+pre-match armory: you carry exactly **one primary, one secondary, and
+one throwable** into battle (`1` / `2` / wheel to swap, `G` to throw).
+Each weapon row shows its class and unlock rank; the stats panel renders
+damage / fire-rate / accuracy / range / mobility bars, live **+/-
+deltas while hovering** an alternative, and magazine / reload / reserve
+numbers. Attachments and equipment live on the same screen, and three
+loadout presets (plus a one-click default) persist locally.
 
-Slot `0` calls the **orbital railgun strike** once the 7-killstreak is earned.
+**Primaries (14)** — assault rifles *Helix AR, Ravager-47, Volt Carbine
+(burst)*; SMGs *Viper, Hornet-90 (50-rd), Tempo*; shotguns *Breacher
+(pump), Mauler-12 (semi-auto)*; LMGs *Bastion, Warhound*; DMRs *Judge,
+Falcon-S*; sniper *Spectre* (scope, one-shot potential); and the
+*Havoc RL* rocket launcher.
 
-Headshots deal double damage (2.5× on the Spectre).
+**Secondaries (3)** — *P-9 Sidearm* (infinite reserve), *Wasp-18*
+machine pistol (full-auto), *Ironclad .44* revolver (2.5× headshots).
+
+**Throwables (4)** — *Frag* (cooked splash), *Sticky Bomb* (latches on,
+bigger blast), *Flashbang* (whites out and stuns anyone with line of
+sight), *Smoke Grenade* (a smoke sphere that blocks AI vision).
+
+Slot `0` calls the **orbital railgun strike** once the 7-killstreak is
+earned. Headshots deal double damage (2.5× on the Spectre and Ironclad).
 
 ## Progression
 

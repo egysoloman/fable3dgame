@@ -50,6 +50,32 @@ function makePanelTexture() {
   return tex;
 }
 
+// Night-tower facade: dark curtain wall with a grid of randomly lit windows.
+function makeWindowTexture(seed) {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 128;
+  const g = c.getContext('2d');
+  const rand = mulberry32(seed);
+  g.fillStyle = '#0a101e';
+  g.fillRect(0, 0, 64, 128);
+  for (let y = 4; y < 124; y += 8) {
+    for (let x = 4; x < 60; x += 8) {
+      const lit = rand() < 0.32;
+      g.fillStyle = lit
+        ? (rand() < 0.8 ? '#ffd890' : '#9fd8ff')
+        : '#151d30';
+      g.globalAlpha = lit ? 0.55 + rand() * 0.45 : 1;
+      g.fillRect(x, y, 5, 5);
+    }
+  }
+  g.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // ---------------------------------------------------------------------------
 // Procedural 360° panoramic skyboxes: each painter fills an equirectangular
 // canvas that wraps a BackSide sphere. Painted once per map load.
@@ -200,51 +226,37 @@ const SKY_PAINTERS = {
     paintClouds(g, w, [h * 0.1, h * 0.24], 5, rand, 0.4);
   },
 
-  // skyscraper dusk: rings of distant towers over a sea of clouds
+  // skyscraper night: a starry sky — the skyline itself is real low-poly
+  // tower models placed around the roof (see the rooftop map build)
   city(g, w, h) {
     const rand = mulberry32(6060);
     skyGradient(g, w, h, [
-      [0, '#141c30'], [0.28, '#2e4468'], [0.4, '#7a5a78'], [0.48, '#d8886a'],
-      [0.52, '#b8c2d2'], [0.66, '#a8b4c4'], [1, '#8a98a8'],
+      [0, '#04060f'], [0.3, '#0a1024'], [0.46, '#141d38'], [0.5, '#1c2440'],
+      [0.56, '#12182c'], [1, '#080c18'],
     ]);
-    paintSun(g, w * 0.78, h * 0.45, 16, '#ffd8a0', 'rgba(255,190,120,0.5)');
-    // three depth layers of high-rise silhouettes with lit windows
-    const layers = [
-      { rise: 0.13, alpha: 0.4, tone: '#3a4a66', lit: 0.25 },
-      { rise: 0.17, alpha: 0.7, tone: '#242f4a', lit: 0.4 },
-      { rise: 0.22, alpha: 1.0, tone: '#101828', lit: 0.6 },
-    ];
-    for (const L of layers) {
-      let x = -rand() * 20;
-      while (x < w) {
-        const bw = 16 + rand() * 38;
-        const bh = h * L.rise * (0.45 + rand() * 0.9);
-        const by = h * 0.52 - bh;
-        g.globalAlpha = L.alpha;
-        g.fillStyle = L.tone;
-        g.fillRect(x, by, bw, bh + h * 0.06);
-        g.fillStyle = '#ffd890';
-        const nWin = Math.floor((bw * bh) / 260);
-        for (let i = 0; i < nWin; i++) {
-          if (rand() > L.lit) continue;
-          g.fillRect(x + 2 + rand() * (bw - 5), by + 3 + rand() * (bh - 4), 1.6, 2.4);
-        }
-        x += bw + 3 + rand() * 12;
-      }
+    for (let i = 0; i < 800; i++) { // dense starfield
+      const sx = rand() * w, sy = rand() * h * 0.52;
+      const sr = rand() < 0.93 ? rand() * 1.1 : 1.2 + rand() * 1.3;
+      g.fillStyle = `rgba(255,250,255,${0.3 + rand() * 0.7})`;
+      g.beginPath();
+      g.arc(sx, sy, sr, 0, Math.PI * 2);
+      g.fill();
     }
-    g.globalAlpha = 1;
-    // cloud sea hiding the streets far below
-    const sea = g.createLinearGradient(0, h * 0.54, 0, h * 0.7);
-    sea.addColorStop(0, 'rgba(226,232,242,0.0)');
-    sea.addColorStop(0.4, 'rgba(226,232,242,0.9)');
-    sea.addColorStop(1, 'rgba(200,210,224,1)');
+    paintSun(g, w * 0.24, h * 0.2, 15, '#e8f0ff', 'rgba(190,210,255,0.35)'); // moon
+    // city glow along the horizon
+    const glow = g.createLinearGradient(0, h * 0.4, 0, h * 0.52);
+    glow.addColorStop(0, 'rgba(90,110,180,0)');
+    glow.addColorStop(1, 'rgba(120,140,210,0.35)');
+    g.fillStyle = glow;
+    g.fillRect(0, h * 0.4, w, h * 0.12);
+    // faint cloud sea below the horizon
+    const sea = g.createLinearGradient(0, h * 0.52, 0, h * 0.7);
+    sea.addColorStop(0, 'rgba(90,102,128,0.0)');
+    sea.addColorStop(0.5, 'rgba(88,98,124,0.85)');
+    sea.addColorStop(1, 'rgba(58,66,88,1)');
     g.fillStyle = sea;
-    g.fillRect(0, h * 0.54, w, h * 0.46);
-    paintClouds(g, w, [h * 0.56, h * 0.68], 22, rand, 0.9);
-    for (let i = 0; i < 90; i++) { // early stars
-      g.fillStyle = `rgba(255,245,255,${0.2 + rand() * 0.4})`;
-      g.fillRect(rand() * w, rand() * h * 0.14, 1.3, 1.3);
-    }
+    g.fillRect(0, h * 0.52, w, h * 0.48);
+    paintClouds(g, w, [h * 0.54, h * 0.66], 18, rand, 0.35);
   },
 
   // battlefield dusk: burning gradient, low sun, streak clouds
@@ -446,63 +458,73 @@ export const MAPS = {
     sun: [0xd8e8ff, 1.35],
     floorColors: ['#1c2228', '#2e3a44', '#8a97a8'],
     accents: [
-      [-45, 0x62f0ff, -45], [45, 0xffcf3b, -45], [-45, 0xffcf3b, 45], [45, 0x62f0ff, 45],
+      [-18, 0x62f0ff, -30], [18, 0xffcf3b, -30], [-18, 0xffcf3b, 30], [18, 0x62f0ff, 30],
     ],
     playerSpawn: [0, 46],
-    domPoints: [[0, -34], [-28, 10], [30, 18]],
-    vehicles: [[-8, 38, 0.4], [8, 38, -0.4], [0, 26, 3.14, 'tank'],
-      [-32, -46, 0, 'heli'], [12, -46, 0, 'heli']],
+    domPoints: [[0, -34], [-20, 10], [20, 18]],
+    vehicles: [[-8, 38, 0.4], [8, 38, -0.4], [10, 32, 3.14, 'tank'],
+      [-9, -42, 0, 'heli'], [9, -42, 0, 'heli']],
+    // warship hull: long deck, tapered bow forward (-z), chamfered stern
+    footprint(x, z) {
+      if (z < -58 || z > 58) return false;
+      let hw = 30;
+      if (z < -20) hw = 30 * (1 - (-20 - z) / 40);
+      else if (z > 46) hw = 30 - (z - 46) * (10 / 12);
+      return Math.abs(x) <= hw;
+    },
+    floorOutline: [[-30, 46], [-30, -20], [0, -58], [30, -20], [30, 46],
+      [20, 58], [-20, 58]],
     build(w) {
-      const S = this.size;
-      // "ocean" tint outside the deck happens via the dark outer plane; add
-      // deck edge rails (low, non-climb-over aesthetic barriers)
       // bridge tower: a tall, climbable multi-level command island with
       // observation decks that overlook the whole flight deck
-      w.addBox(34, 2.5, -8, 10, 5, 8, w.mats.bunker);      // base block
-      w.addBox(34, 6.2, -8, 7, 2.4, 6, w.mats.bunker);     // bridge level
-      w.addBox(36, 8.6, -8, 4, 2.4, 4, w.mats.pillar);     // control level
-      w.addBox(36, 11.0, -8, 3, 2.4, 3, w.mats.pillar);    // observation top
-      w.addTrim(34, 5.1, -8, 10.2, 0.2, 8.2);
-      w.addTrim(34, 7.5, -8, 7.2, 0.2, 6.2);
-      w.addTrim(36, 9.9, -8, 4.2, 0.2, 4.2);
-      w.addTrim(36, 12.3, -8, 3.2, 0.2, 3.2);
+      w.addBox(22, 2.5, -8, 10, 5, 8, w.mats.bunker);      // base block
+      w.addBox(22, 6.2, -8, 7, 2.4, 6, w.mats.bunker);     // bridge level
+      w.addBox(24, 8.6, -8, 4, 2.4, 4, w.mats.pillar);     // control level
+      w.addBox(24, 11.0, -8, 3, 2.4, 3, w.mats.pillar);    // observation top
+      w.addTrim(22, 5.1, -8, 10.2, 0.2, 8.2);
+      w.addTrim(22, 7.5, -8, 7.2, 0.2, 6.2);
+      w.addTrim(24, 9.9, -8, 4.2, 0.2, 4.2);
+      w.addTrim(24, 12.3, -8, 3.2, 0.2, 3.2);
       // radar mast + antenna arrays
-      w.addBox(36, 14.0, -8, 0.4, 3.6, 0.4, w.mats.pillar);
-      w.addTrim(36, 15.9, -8, 2.6, 0.12, 0.3);
-      w.addTrim(36, 15.2, -8, 0.3, 0.12, 2.2);
+      w.addBox(24, 14.0, -8, 0.4, 3.6, 0.4, w.mats.pillar);
+      w.addTrim(24, 15.9, -8, 2.6, 0.12, 0.3);
+      w.addTrim(24, 15.2, -8, 0.3, 0.12, 2.2);
       // crate stairs winding up the island, one hop per landing
-      w.addBox(27.5, 0.7, -8, 3, 1.4, 3, w.mats.container);
-      w.addBox(30.5, 1.9, -8, 3, 3.8, 3, w.mats.container);
-      w.addBox(31, 5.7, -10.4, 2, 1.4, 2, w.mats.container);
-      w.addBox(32, 8.1, -6.4, 2, 1.4, 2, w.mats.container);
-      w.addBox(37.2, 10.5, -6.2, 1.6, 1.4, 1.6, w.mats.container);
+      w.addBox(15.5, 0.7, -8, 3, 1.4, 3, w.mats.container);
+      w.addBox(18.5, 1.9, -8, 3, 3.8, 3, w.mats.container);
+      w.addBox(19, 5.7, -10.4, 2, 1.4, 2, w.mats.container);
+      w.addBox(20, 8.1, -6.4, 2, 1.4, 2, w.mats.container);
+      w.addBox(25.2, 10.5, -6.2, 1.6, 1.4, 1.6, w.mats.container);
 
-      // parked jets: fuselage + wing blocks, good hard cover
-      const jets = [[-20, -30, 0], [-2, -36, 1], [16, -28, 0]];
+      // parked jets on the bow: fuselage + wing blocks, good hard cover
+      const jets = [[-15, -28, 0], [-1, -36, 1], [13, -26, 0]];
       for (const [jx, jz] of jets) {
         w.addBox(jx, 1.1, jz, 2.2, 2.2, 9, w.mats.container);
         w.addBox(jx, 0.8, jz + 1, 8, 0.5, 3, w.mats.bunker);
       }
 
       // hangar bay: roofed section with support pillars (CQB)
-      w.addBox(-30, 3.4, 14, 24, 0.6, 22, w.mats.bunker);   // roof slab
-      for (const [px, pz] of [[-40, 5], [-20, 5], [-40, 23], [-20, 23]]) {
+      w.addBox(-14, 3.4, 14, 24, 0.6, 22, w.mats.bunker);   // roof slab
+      for (const [px, pz] of [[-24, 5], [-4, 5], [-24, 23], [-4, 23]]) {
         w.addBox(px, 1.55, pz, 1.2, 3.1, 1.2, w.mats.pillar);
       }
-      w.addBox(-30, 1.5, 25, 24, 3, 1, w.mats.bunker);      // hangar back wall
+      w.addBox(-14, 1.5, 25, 24, 3, 1, w.mats.bunker);      // hangar back wall
       for (let i = 0; i < 4; i++) {
-        w.addBox(-38 + i * 6, 1, 12, 2.4, 2, 2.4, w.mats.container);
+        w.addBox(-22 + i * 6, 1, 12, 2.4, 2, 2.4, w.mats.container);
       }
-      w.addTrim(-30, 3.8, 14, 24.2, 0.15, 22.2);
+      w.addTrim(-14, 3.8, 14, 24.2, 0.15, 22.2);
 
       // catapult ramps & deck clutter
-      w.addBox(8, 0.55, 8, 12, 1.1, 1.6, w.mats.sandbag);
-      w.addBox(-6, 0.55, -12, 1.6, 1.1, 12, w.mats.sandbag);
+      w.addBox(8, 0.55, -14, 12, 1.1, 1.6, w.mats.sandbag);
+      w.addBox(-22, 0.55, -4, 1.6, 1.1, 12, w.mats.sandbag);
       w.addBox(20, 0.9, 34, 3, 1.8, 3, w.mats.container);
       w.addBox(-16, 0.9, 36, 3, 1.8, 3, w.mats.container);
-      w.addBox(44, 0.9, 30, 3, 1.8, 3, w.mats.container);
+      w.addBox(24, 0.9, 30, 3, 1.8, 3, w.mats.container);
 
-      w.spawnPoints = w.ringSpawns(12, S / 2 - 6);
+      w.spawnPoints = [
+        [-12, -24], [12, -24], [0, -40], [-16, 0], [16, 0], [-26, 20],
+        [26, 20], [-12, 40], [12, 40], [0, 52], [-22, 34], [26, -2],
+      ].map(([sx, sz]) => new THREE.Vector3(sx, 0, sz));
     },
   },
 
@@ -574,12 +596,12 @@ export const MAPS = {
     sky: 'city',
     edge: 'fall',        // no railings up here
     outerY: -60,
-    outerColor: 0xb8c4d0, // the cloud sea far below
-    fog: [0x9aa8b8, 42, 220],
-    bg: 0x9aa8b8,
-    hemi: [0xffc890, 0x2a3448, 1.15],
-    sun: [0xffd8a0, 1.45],
-    floorColors: ['#3a3f4a', '#4a5262', '#8a94a8'],
+    outerColor: 0x3e4658, // the moonlit cloud sea far below
+    fog: [0x0a0e1c, 48, 240],
+    bg: 0x0a0e1c,
+    hemi: [0x4a5f8a, 0x0c1018, 1.0],
+    sun: [0xbfd4ff, 1.0],
+    floorColors: ['#1a1f2c', '#2c3446', '#5a6a8a'],
     accents: [
       [-34, 0xffcf3b, -34], [34, 0x27e8ff, -34], [-34, 0xff3bd4, 34], [34, 0xffb347, 34],
     ],
@@ -630,6 +652,32 @@ export const MAPS = {
         const s = 1.4 + rand() * 1.6;
         w.addBox(x, 0.7, z, s, 1.4, s, w.mats.crate);
       }
+      // the surrounding city: rings of low-poly towers with lit windows,
+      // rising out of the cloud sea — real models, unreachable across the drop
+      for (let i = 0; i < 26; i++) {
+        const a = (i / 26) * Math.PI * 2 + rand() * 0.18;
+        const radius = 72 + rand() * 58;
+        const bw = 9 + rand() * 12;
+        const top = -12 + rand() * 34;              // relative to the roof
+        const bh = top + 62;                        // base hidden in the clouds
+        const tex = makeWindowTexture(8181 + i);
+        tex.repeat.set(Math.max(1, Math.round(bw / 6)), Math.max(2, Math.round(bh / 12)));
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xcfd8ea, map: tex, roughness: 0.85, metalness: 0.15 });
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(bw, bh, bw * (0.7 + rand() * 0.6)), mat);
+        mesh.position.set(Math.cos(a) * radius, top - bh / 2, Math.sin(a) * radius);
+        mesh.rotation.y = rand() * Math.PI;
+        w.root.add(mesh);
+        if (rand() < 0.3) {  // a few rooftop beacons
+          const beacon = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 1.6, 0.5),
+            new THREE.MeshStandardMaterial({
+              color: 0xff4d4d, emissive: 0xff4d4d, emissiveIntensity: 1.5 }));
+          beacon.position.set(mesh.position.x, top + 0.8, mesh.position.z);
+          w.root.add(beacon);
+        }
+      }
       w.spawnPoints = w.ringSpawns(12, this.size / 2 - 6);
     },
   },
@@ -656,6 +704,7 @@ export class World {
   // step past it and there is nothing below you.
   groundAt(x, z) {
     if (this.map.edge !== 'fall') return true;
+    if (this.map.footprint) return this.map.footprint(x, z);
     return Math.abs(x) <= this.half && Math.abs(z) <= this.half;
   }
 
@@ -789,10 +838,27 @@ export class World {
   _buildFloor() {
     const map = this.map;
     const tex = makeGridTexture(...map.floorColors);
-    tex.repeat.set(map.size / 4, map.size / 4);
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.25 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(map.size, map.size), mat);
-    floor.rotation.x = -Math.PI / 2;
+    let floor;
+    if (map.floorOutline) {
+      // non-square deck (e.g. the carrier hull): shape polygon in the XZ plane
+      const shape = new THREE.Shape();
+      map.floorOutline.forEach(([px, pz], i) => {
+        if (i === 0) shape.moveTo(px, -pz);
+        else shape.lineTo(px, -pz);
+      });
+      shape.closePath();
+      const geo = new THREE.ShapeGeometry(shape);
+      geo.rotateX(-Math.PI / 2);
+      const uv = geo.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 4, uv.getY(i) / 4);
+      mat.side = THREE.DoubleSide; // winding-proof
+      floor = new THREE.Mesh(geo, mat);
+    } else {
+      tex.repeat.set(map.size / 4, map.size / 4);
+      floor = new THREE.Mesh(new THREE.PlaneGeometry(map.size, map.size), mat);
+      floor.rotation.x = -Math.PI / 2;
+    }
     floor.receiveShadow = true;
     this.root.add(floor);
     this.colliderMeshes.push(floor);

@@ -289,6 +289,7 @@ class Hoverbike extends Vehicle {
     this.yaw += steer * dt * (1.2 + Math.min(1.4, Math.abs(this.speed) * 0.08)) *
       Math.sign(this.speed >= 0 ? 1 : -1);
 
+    const px0 = this.position.x, pz0 = this.position.z;
     const dx = -Math.sin(this.yaw) * this.speed * dt;
     const dz = -Math.cos(this.yaw) * this.speed * dt;
     this._moveAxis('x', dx);
@@ -296,6 +297,11 @@ class Hoverbike extends Vehicle {
     const half = this.game.world.half - 1;
     this.position.x = Math.max(-half, Math.min(half, this.position.x));
     this.position.z = Math.max(-half, Math.min(half, this.position.z));
+    if (!this.game.world.groundAt(this.position.x, this.position.z)) {
+      this.position.x = px0;
+      this.position.z = pz0;
+      this.speed *= 0.3;
+    }
 
     // ram damage (the bike takes wear too)
     if (Math.abs(this.speed) > 8) {
@@ -368,11 +374,17 @@ class Tank extends Vehicle {
     this.speed = Math.max(-3.5, Math.min(7, this.speed));
     this.yaw += steer * dt * 0.9;
 
+    const px0 = this.position.x, pz0 = this.position.z;
     this._moveAxis('x', -Math.sin(this.yaw) * this.speed * dt);
     this._moveAxis('z', -Math.cos(this.yaw) * this.speed * dt);
     const half = this.game.world.half - 2;
     this.position.x = Math.max(-half, Math.min(half, this.position.x));
     this.position.z = Math.max(-half, Math.min(half, this.position.z));
+    if (!this.game.world.groundAt(this.position.x, this.position.z)) {
+      this.position.x = px0;
+      this.position.z = pz0;
+      this.speed *= 0.3;
+    }
 
     // tracks crush anything they touch
     if (Math.abs(this.speed) > 1.5) {

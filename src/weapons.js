@@ -5,7 +5,7 @@ const HIP_POS = new THREE.Vector3(0.28, -0.26, -0.5);
 
 export const WEAPON_DEFS = [
   {
-    id: 'pistol', unlockRank: 1, name: 'P-9 SIDEARM', sound: 'pistol',
+    id: 'pistol', cat: 'secondary', wclass: 'pistol', unlockRank: 1, name: 'P-9 SIDEARM', sound: 'pistol',
     damage: 25, pellets: 1, fireDelay: 0.22, auto: false,
     spreadHip: 0.014, spreadAds: 0.004, bloom: 0.006,
     magSize: 12, reserve: Infinity, reloadTime: 0.9,
@@ -15,7 +15,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.3, bodyLen: 0.22, thickness: 0.07,
   },
   {
-    id: 'smg', unlockRank: 1, name: 'VIPER SMG', sound: 'smg',
+    id: 'smg', cat: 'primary', wclass: 'smg', unlockRank: 1, name: 'VIPER SMG', sound: 'smg',
     damage: 11, pellets: 1, fireDelay: 0.075, auto: true,
     spreadHip: 0.026, spreadAds: 0.012, bloom: 0.004,
     magSize: 32, reserve: 160, reloadTime: 1.4,
@@ -25,7 +25,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.3, bodyLen: 0.3, thickness: 0.075,
   },
   {
-    id: 'rifle', unlockRank: 1, name: 'HELIX AR', sound: 'rifle',
+    id: 'rifle', cat: 'primary', wclass: 'ar', unlockRank: 1, name: 'HELIX AR', sound: 'rifle',
     damage: 16, pellets: 1, fireDelay: 0.105, auto: true,
     spreadHip: 0.022, spreadAds: 0.006, bloom: 0.005,
     magSize: 30, reserve: 150, reloadTime: 1.7,
@@ -35,7 +35,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.5, bodyLen: 0.34, thickness: 0.085, sight: true,
   },
   {
-    id: 'dmr', unlockRank: 2, name: 'JUDGE DMR', sound: 'dmr',
+    id: 'dmr', cat: 'primary', wclass: 'dmr', unlockRank: 2, name: 'JUDGE DMR', sound: 'dmr',
     damage: 42, pellets: 1, fireDelay: 0.28, auto: false,
     spreadHip: 0.014, spreadAds: 0.003, bloom: 0.006,
     magSize: 12, reserve: 48, reloadTime: 1.8,
@@ -45,7 +45,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.58, bodyLen: 0.36, thickness: 0.08, sight: true,
   },
   {
-    id: 'shotgun', unlockRank: 3, name: 'BREACHER', sound: 'shotgun',
+    id: 'shotgun', cat: 'primary', wclass: 'shotgun', unlockRank: 3, name: 'BREACHER', sound: 'shotgun',
     damage: 9, pellets: 8, fireDelay: 0.85, auto: false,
     spreadHip: 0.07, spreadAds: 0.05, bloom: 0.008,
     magSize: 6, reserve: 30, reloadTime: 2.2,
@@ -55,7 +55,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.44, bodyLen: 0.32, thickness: 0.105,
   },
   {
-    id: 'lmg', unlockRank: 4, name: 'BASTION LMG', sound: 'lmg',
+    id: 'lmg', cat: 'primary', wclass: 'lmg', unlockRank: 4, name: 'BASTION LMG', sound: 'lmg',
     damage: 14, pellets: 1, fireDelay: 0.09, auto: true,
     spreadHip: 0.032, spreadAds: 0.014, bloom: 0.0045,
     magSize: 75, reserve: 150, reloadTime: 3.6,
@@ -65,7 +65,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.55, bodyLen: 0.42, thickness: 0.1, mag: true,
   },
   {
-    id: 'sniper', unlockRank: 5, name: 'SPECTRE', sound: 'sniper',
+    id: 'sniper', cat: 'primary', wclass: 'sniper', unlockRank: 5, name: 'SPECTRE', sound: 'sniper',
     damage: 120, pellets: 1, fireDelay: 1.25, auto: false,
     spreadHip: 0.05, spreadAds: 0.0006, bloom: 0.01,
     magSize: 5, reserve: 20, reloadTime: 2.6,
@@ -75,7 +75,7 @@ export const WEAPON_DEFS = [
     barrelLen: 0.72, bodyLen: 0.38, thickness: 0.08, sight: true,
   },
   {
-    id: 'launcher', unlockRank: 6, name: 'HAVOC RL', sound: 'rocket',
+    id: 'launcher', cat: 'primary', wclass: 'heavy', unlockRank: 6, name: 'HAVOC RL', sound: 'rocket',
     damage: 0, pellets: 0, fireDelay: 1.6, auto: false,
     spreadHip: 0.01, spreadAds: 0.004, bloom: 0,
     magSize: 1, reserve: 7, reloadTime: 2.8,
@@ -86,7 +86,7 @@ export const WEAPON_DEFS = [
     rocket: { speed: 30, splashRadius: 4.5, splashDmg: 95 },
   },
   {
-    id: 'carbine', unlockRank: 7, name: 'VOLT CARBINE', sound: 'dmr',
+    id: 'carbine', cat: 'primary', wclass: 'ar', unlockRank: 7, name: 'VOLT CARBINE', sound: 'dmr',
     damage: 20, pellets: 1, fireDelay: 0.34, auto: false, burst: 3, burstDelay: 0.07,
     spreadHip: 0.018, spreadAds: 0.004, bloom: 0.005,
     magSize: 24, reserve: 96, reloadTime: 1.9,
@@ -95,9 +95,135 @@ export const WEAPON_DEFS = [
     bodyColor: 0x2f4a4a, accentColor: 0x3affd8,
     barrelLen: 0.5, bodyLen: 0.34, thickness: 0.08, sight: true,
   },
+  // ---- expanded primaries ----
+  {
+    id: 'akr', cat: 'primary', wclass: 'ar', unlockRank: 3, name: 'RAVAGER-47', sound: 'rifle',
+    damage: 22, pellets: 1, fireDelay: 0.13, auto: true,
+    spreadHip: 0.027, spreadAds: 0.009, bloom: 0.006,
+    magSize: 30, reserve: 120, reloadTime: 1.9,
+    recoil: 0.042, kick: 0.008, tracer: 0xffb06a,
+    adsFov: 58, scope: false, moveMul: 0.94, headshotMul: 2,
+    bodyColor: 0x53392e, accentColor: 0xff7a3b,
+    barrelLen: 0.52, bodyLen: 0.34, thickness: 0.09, sight: true, mag: true,
+  },
+  {
+    id: 'p90', cat: 'primary', wclass: 'smg', unlockRank: 4, name: 'HORNET-90', sound: 'smg',
+    damage: 10, pellets: 1, fireDelay: 0.068, auto: true,
+    spreadHip: 0.024, spreadAds: 0.011, bloom: 0.0035,
+    magSize: 50, reserve: 150, reloadTime: 2.0,
+    recoil: 0.017, kick: 0.003, tracer: 0xfff06a,
+    adsFov: 60, scope: false, moveMul: 1.0, headshotMul: 2,
+    bodyColor: 0x4a4a30, accentColor: 0xe8e83b,
+    barrelLen: 0.26, bodyLen: 0.36, thickness: 0.085,
+  },
+  {
+    id: 'vector', cat: 'primary', wclass: 'smg', unlockRank: 6, name: 'TEMPO SMG', sound: 'smg',
+    damage: 9, pellets: 1, fireDelay: 0.055, auto: true,
+    spreadHip: 0.02, spreadAds: 0.009, bloom: 0.003,
+    magSize: 28, reserve: 140, reloadTime: 1.5,
+    recoil: 0.013, kick: 0.0028, tracer: 0x8ad0ff,
+    adsFov: 60, scope: false, moveMul: 1.0, headshotMul: 2,
+    bodyColor: 0x2e3e52, accentColor: 0x6ab8ff,
+    barrelLen: 0.3, bodyLen: 0.28, thickness: 0.07,
+  },
+  {
+    id: 'autoshotgun', cat: 'primary', wclass: 'shotgun', unlockRank: 7, name: 'MAULER-12', sound: 'shotgun',
+    damage: 7, pellets: 8, fireDelay: 0.45, auto: false,
+    spreadHip: 0.075, spreadAds: 0.055, bloom: 0.007,
+    magSize: 8, reserve: 32, reloadTime: 2.6,
+    recoil: 0.1, kick: 0.017, tracer: 0xffd98a,
+    adsFov: 65, scope: false, moveMul: 0.92, headshotMul: 2,
+    bodyColor: 0x5a3a30, accentColor: 0xff9a47,
+    barrelLen: 0.48, bodyLen: 0.34, thickness: 0.11, mag: true,
+  },
+  {
+    id: 'pkm', cat: 'primary', wclass: 'lmg', unlockRank: 8, name: 'WARHOUND', sound: 'lmg',
+    damage: 17, pellets: 1, fireDelay: 0.115, auto: true,
+    spreadHip: 0.035, spreadAds: 0.016, bloom: 0.005,
+    magSize: 90, reserve: 180, reloadTime: 4.2,
+    recoil: 0.042, kick: 0.008, tracer: 0xff8a6a,
+    adsFov: 60, scope: false, moveMul: 0.8, headshotMul: 2,
+    bodyColor: 0x463226, accentColor: 0xd85a2a,
+    barrelLen: 0.6, bodyLen: 0.44, thickness: 0.105, mag: true,
+  },
+  {
+    id: 'sks', cat: 'primary', wclass: 'dmr', unlockRank: 5, name: 'FALCON-S', sound: 'dmr',
+    damage: 32, pellets: 1, fireDelay: 0.19, auto: false,
+    spreadHip: 0.015, spreadAds: 0.0035, bloom: 0.005,
+    magSize: 15, reserve: 60, reloadTime: 1.7,
+    recoil: 0.048, kick: 0.009, tracer: 0xd8ffa8,
+    adsFov: 48, scope: false, moveMul: 0.93, headshotMul: 2,
+    bodyColor: 0x3e4a34, accentColor: 0xa8d86a,
+    barrelLen: 0.56, bodyLen: 0.34, thickness: 0.078, sight: true,
+  },
+  // ---- expanded secondaries ----
+  {
+    id: 'mpistol', cat: 'secondary', wclass: 'mpistol', unlockRank: 2, name: 'WASP-18', sound: 'smg',
+    damage: 9, pellets: 1, fireDelay: 0.07, auto: true,
+    spreadHip: 0.03, spreadAds: 0.014, bloom: 0.005,
+    magSize: 18, reserve: 144, reloadTime: 1.3,
+    recoil: 0.024, kick: 0.004, tracer: 0xffe86a,
+    adsFov: 62, scope: false, moveMul: 1.0, headshotMul: 2,
+    bodyColor: 0x4a4436, accentColor: 0xffd83b,
+    barrelLen: 0.24, bodyLen: 0.2, thickness: 0.065,
+  },
+  {
+    id: 'revolver', cat: 'secondary', wclass: 'revolver', unlockRank: 4, name: 'IRONCLAD .44', sound: 'dmr',
+    damage: 55, pellets: 1, fireDelay: 0.5, auto: false,
+    spreadHip: 0.016, spreadAds: 0.004, bloom: 0.008,
+    magSize: 6, reserve: 36, reloadTime: 2.4,
+    recoil: 0.11, kick: 0.018, tracer: 0xffc9c9,
+    adsFov: 56, scope: false, moveMul: 0.98, headshotMul: 2.5,
+    bodyColor: 0x50403c, accentColor: 0xff8a7a,
+    barrelLen: 0.36, bodyLen: 0.2, thickness: 0.08,
+  },
 ];
 
-const GRENADE = { fuse: 2.2, splashRadius: 5, splashDmg: 110, throwSpeed: 17, max: 5 };
+// Throwables: one type carried per loadout. Lethal types splash; tacticals
+// flash (blind + stun) or smoke (blocks AI line of sight).
+export const THROWABLES = {
+  frag: { id: 'frag', lethal: true, fuse: 2.2, splashRadius: 5, splashDmg: 110,
+    throwSpeed: 17, max: 5, color: 0x3a4436 },
+  sticky: { id: 'sticky', lethal: true, fuse: 1.7, splashRadius: 4.5, splashDmg: 130,
+    throwSpeed: 15, max: 4, sticky: true, color: 0x27e8ff },
+  flash: { id: 'flash', lethal: false, fuse: 1.4, splashRadius: 12, splashDmg: 0,
+    throwSpeed: 18, max: 4, flash: true, color: 0xf0f0e0 },
+  smoke: { id: 'smoke', lethal: false, fuse: 1.2, splashRadius: 5, splashDmg: 0,
+    throwSpeed: 14, max: 4, smoke: true, color: 0x8a97a8 },
+};
+const GRENADE = THROWABLES.frag;
+
+// ---- loadout: one primary + one secondary + one throwable ----
+const LOADOUT_KEY = 'neonstrike.loadout';
+const PRESETS_KEY = 'neonstrike.presets';
+export const DEFAULT_LOADOUT = { primary: 'rifle', secondary: 'pistol', throwable: 'frag' };
+
+export function loadLoadout() {
+  const out = { ...DEFAULT_LOADOUT };
+  try {
+    const st = JSON.parse(localStorage.getItem(LOADOUT_KEY) || '{}');
+    for (const cat of ['primary', 'secondary']) {
+      if (WEAPON_DEFS.some((d) => d.id === st[cat] && d.cat === cat)) out[cat] = st[cat];
+    }
+    if (THROWABLES[st.throwable]) out.throwable = st.throwable;
+  } catch (e) { /* defaults */ }
+  return out;
+}
+
+export function saveLoadout(l) {
+  try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(l)); } catch (e) { /* ok */ }
+}
+
+export function loadPresets() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]');
+    return [v[0] || null, v[1] || null, v[2] || null];
+  } catch (e) { return [null, null, null]; }
+}
+
+export function savePresets(list) {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch (e) { /* ok */ }
+}
 
 // Attachment system: one option per slot, chosen pre-match, multiplies the
 // arsenal's stats. Omitted fields default to 1 (neutral).
@@ -234,7 +360,7 @@ class Explosive {
     this.kind = kind; // 'rocket' | 'grenade'
     this.vel = vel.clone();
     this.config = config;
-    this.fuse = kind === 'grenade' ? GRENADE.fuse : 8;
+    this.fuse = config.fuse !== undefined ? config.fuse : 8;
     if (kind === 'rocket') {
       const geo = new THREE.ConeGeometry(0.09, 0.34, 6);
       geo.rotateX(Math.PI / 2);
@@ -242,8 +368,12 @@ class Explosive {
     } else {
       this.mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.11, 8, 8),
-        new THREE.MeshStandardMaterial({ color: 0x3a4436, roughness: 0.4, metalness: 0.6 }));
+        new THREE.MeshStandardMaterial({
+          color: config.color || 0x3a4436, roughness: 0.4, metalness: 0.6,
+          emissive: config.sticky ? (config.color || 0) : 0,
+          emissiveIntensity: config.sticky ? 0.8 : 0 }));
     }
+    this.stuck = false;
     this.mesh.position.copy(pos);
     game.scene.add(this.mesh);
   }
@@ -279,6 +409,7 @@ class Explosive {
 
   // One integration substep. Returns false if the explosive detonated.
   _step(h) {
+    if (this.stuck) return true;
     const pos = this.mesh.position;
     if (this.kind === 'grenade') this.vel.y -= 22 * h;
 
@@ -307,6 +438,14 @@ class Explosive {
         if (dx * dx + dy * dy + dz * dz < 0.35 * 0.35) { this.explode(); return false; }
       }
     } else {
+      // sticky grenades latch onto the first thing they touch
+      if (this.config.sticky && (hit || hitFloor)) {
+        if (hitFloor) pos.y = 0.11;
+        else pos.sub(step);
+        this.vel.set(0, 0, 0);
+        this.stuck = true;
+        return true;
+      }
       // grenades bounce
       if (hitFloor && this.vel.y < 0) {
         pos.y = 0.11;
@@ -327,6 +466,14 @@ class Explosive {
   }
 
   explode() {
+    if (this.config.flash) {
+      this.game.applyFlash(this.mesh.position, this.config.splashRadius);
+      return;
+    }
+    if (this.config.smoke) {
+      this.game.applySmoke(this.mesh.position.clone(), 8);
+      return;
+    }
     this.game.applySplash(this.mesh.position, this.config.splashRadius, this.config.splashDmg);
   }
 
@@ -354,6 +501,8 @@ export class WeaponSystem {
     this.raycaster.far = 300;
 
     this.attachments = loadAttachments();
+    this.loadout = loadLoadout();
+    this.throwable = THROWABLES[this.loadout.throwable] || THROWABLES.frag;
     this.mods = { dmg: 1, mag: 1, reload: 1, spread: 1, recoil: 1, adsFov: 1, move: 1, adsSpeed: 1 };
 
     this.rig = new THREE.Group();
@@ -365,6 +514,7 @@ export class WeaponSystem {
     }
     this.current.model.visible = true;
     this._recomputeMods();
+    this.applyLoadout(true);
 
     this.recoilOffset = 0;
     this.swayTime = 0;
@@ -404,24 +554,51 @@ export class WeaponSystem {
         return;
       }
       if (this.game.orbital && this.game.orbital.active) return;
-      const digits = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7',
-        'Digit8', 'Digit9'];
-      const di = digits.indexOf(e.code);
-      if (di >= 0) this.switchTo(di);
+      // loadout carry: 1 = primary, 2 = secondary
+      if (e.code === 'Digit1') this.switchTo(this.carryIndex('primary'));
+      else if (e.code === 'Digit2') this.switchTo(this.carryIndex('secondary'));
       else if (e.code === 'KeyR') this.startReload();
       else if (e.code === 'KeyG') this.throwGrenade();
     });
     window.addEventListener('wheel', (e) => {
       if (!this.game.playing || !this.game.pointerLocked) return;
-      const dir = e.deltaY > 0 ? 1 : -1;
-      // step to the next unlocked weapon
-      let i = this.index;
-      for (let step = 0; step < this.weapons.length; step++) {
-        i = (i + dir + this.weapons.length) % this.weapons.length;
-        if (this.game.progression.isUnlocked(this.weapons[i].def)) break;
-      }
-      this.switchTo(i);
+      // wheel swaps between the two carried weapons
+      const p = this.carryIndex('primary');
+      const s = this.carryIndex('secondary');
+      this.switchTo(this.index === p ? s : p);
     });
+  }
+
+  carryIndex(cat) {
+    return this.weapons.findIndex((w) => w.def.id === this.loadout[cat]);
+  }
+
+  // Enforce the loadout: locked picks fall back to defaults, the throwable
+  // def is resolved, and the primary is raised.
+  applyLoadout(silent = true) {
+    const prog = this.game.progression;
+    for (const cat of ['primary', 'secondary']) {
+      const def = WEAPON_DEFS.find((d) => d.id === this.loadout[cat]);
+      if (!def || def.cat !== cat || !prog.isUnlocked(def)) {
+        this.loadout[cat] = DEFAULT_LOADOUT[cat];
+      }
+    }
+    this.throwable = THROWABLES[this.loadout.throwable] || THROWABLES.frag;
+    this.switchTo(this.carryIndex('primary'), silent);
+  }
+
+  setLoadoutItem(cat, id) {
+    if (cat === 'throwable') {
+      if (!THROWABLES[id]) return false;
+    } else {
+      const def = WEAPON_DEFS.find((d) => d.id === id);
+      if (!def || def.cat !== cat) return false;
+      if (!this.game.progression.isUnlocked(def)) return false;
+    }
+    this.loadout[cat] = id;
+    saveLoadout(this.loadout);
+    this.applyLoadout(true);
+    return true;
   }
 
   get current() {
@@ -464,7 +641,7 @@ export class WeaponSystem {
     this.grenades = 3 + this.game.progression.grenadeBonus();
     this.ads = false;
     this.adsAmount = 0;
-    this.switchTo(0, true);
+    this.applyLoadout(true);
     this.triggerHeld = false;
     this.updateHud();
   }
@@ -521,14 +698,16 @@ export class WeaponSystem {
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
     const from = this.game.player.eyePosition.addScaledVector(dir, 0.5);
-    const vel = dir.multiplyScalar(GRENADE.throwSpeed);
+    const cfg = this.throwable || THROWABLES.frag;
+    const vel = dir.multiplyScalar(cfg.throwSpeed);
     vel.y += 3.5;
-    this.explosives.push(new Explosive(this.game, 'grenade', from, vel, GRENADE));
+    this.explosives.push(new Explosive(this.game, 'grenade', from, vel, cfg));
     this.updateHud();
   }
 
   addGrenade(n = 1) {
-    const cap = GRENADE.max + this.game.progression.grenadeCapBonus();
+    const cap = (this.throwable || THROWABLES.frag).max +
+      this.game.progression.grenadeCapBonus();
     this.grenades = Math.min(cap, this.grenades + n);
     this.updateHud();
   }

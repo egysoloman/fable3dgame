@@ -72,6 +72,7 @@ export class HUD {
     document.getElementById('lobby-screen').classList.toggle('visible', name === 'lobby');
     document.getElementById('mpover-screen').classList.toggle('visible', name === 'mpover');
     document.getElementById('setup-screen').classList.toggle('visible', name === 'setup');
+    document.getElementById('loadout-screen').classList.toggle('visible', name === 'loadout');
   }
 
   setArmor(v) {
@@ -80,6 +81,16 @@ export class HUD {
 
   setMountHint(on) {
     this.el.mountHint.classList.toggle('visible', on);
+  }
+
+  flashBang(intensity) {
+    const el = document.getElementById('flash-overlay');
+    el.style.transition = 'none';
+    el.style.opacity = String(Math.min(1, intensity));
+    requestAnimationFrame(() => {
+      el.style.transition = `opacity ${1.2 + intensity * 1.6}s ease-out`;
+      el.style.opacity = '0';
+    });
   }
 
   setOob(secondsLeft) {
