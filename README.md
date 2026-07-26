@@ -38,6 +38,7 @@ Then open <http://localhost:8080> and click **ENGAGE**.
 | `1`–`8` or wheel | Switch weapon |
 | `R` | Reload |
 | `Esc` | Pause (sensitivity & volume settings) |
+| `~` / `F1` | Dev console (cheats) |
 
 ## Core features
 
@@ -71,6 +72,36 @@ Then open <http://localhost:8080> and click **ENGAGE**.
 | 8 | **Havoc RL** | Rocket launcher with splash damage |
 
 Headshots deal double damage (2.5× on the Spectre).
+
+## Progression
+
+Kills and wave clears earn persistent XP (saved locally). Ranks 1–10 unlock
+the arsenal — the DMR at rank 2, shotgun at 3, LMG at 4, sniper at 5,
+launcher at 6 — and passive perks:
+
+| Rank | Perk | Effect |
+| --- | --- | --- |
+| 2 | Swift Hands | 20% faster reloads |
+| 4 | Conditioning | 8% faster sprint |
+| 6 | Bandolier | +1 starting grenade, +2 capacity |
+| 8 | Juggernaut | 125 max integrity |
+| 10 | Dead Eye | +10% bullet damage |
+
+## Dev console (cheats)
+
+Press `~` or `F1` to open the keyboard-navigable dev console (arrows to
+select, Enter to toggle, same key to close). Available cheats: god mode,
+infinite ammo, no-reload, instant kill, unlock all weapons, max level,
+slow motion, full radar, infinite grenades, plus spawn-next-wave and
+reset-all actions.
+
+- Toggles are announced in the kill feed, and a dashed red frame with a
+  **CHEATS ACTIVE** badge stays on screen while any cheat is enabled, for
+  debugging transparency.
+- Cheat states persist between sessions (localStorage).
+- Runs played with cheats active do not bank XP or the persistent best score.
+- For public builds, serve the game with `?nocheats=1` to disable the
+  console entirely.
 
 ## Enemies
 
