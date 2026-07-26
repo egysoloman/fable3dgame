@@ -18,10 +18,12 @@ npm start          # serves the game and the room server on :8080
 ```
 
 Open <http://localhost:8080>. **SOLO** starts an offline run; **MULTIPLAYER**
-opens the room browser — create a room, share the 4-letter code, ready up,
-and fight waves together (up to 4 players). Set `PORT` to change the port;
-the server is a single Node process (static files + WebSocket room hub) and
-deploys to any Node host.
+opens the room browser — hit **QUICK PLAY** to be matched into the fullest
+open lobby (or get a fresh one), or create a room and share the 4-letter
+code, ready up, and fight together (8 players per room by default; set
+`MAX_PLAYERS` up to 16). Set `PORT` to change the port; the server is a
+single Node process (static files + WebSocket room hub) and deploys to any
+Node host.
 
 ### Production deployment
 
@@ -41,9 +43,9 @@ Behind a TLS proxy the client automatically uses `wss://`. Serve with
 (status badge shows connecting/connected/failed/offline; the last-used
 address persists locally). This lets a statically-hosted frontend talk to a
 room server anywhere. Server-side environment variables: `PORT`, `HOST`
-(default `0.0.0.0`), `ALLOW_ORIGIN` (CORS, default `*`), and
-`DEFAULT_SERVER_ADDRESS` — injected into the page as the default the client
-offers first-time visitors.
+(default `0.0.0.0`), `ALLOW_ORIGIN` (CORS, default `*`), `MAX_PLAYERS`
+(room capacity, default 8, max 16), and `DEFAULT_SERVER_ADDRESS` — injected
+into the page as the default the client offers first-time visitors.
 
 ## Solo without Node
 
@@ -89,6 +91,12 @@ Clicking **SOLO** opens mission setup:
   regen), **Raider Boots** (+8% speed, higher jump).
 - **Vehicles** — walk up to a hoverbike and press `E` to ride: W/S
   throttle, A/D steer, ram enemies at speed for kills.
+- **Weapon attachments** — five slots (optic, barrel, magazine, grip,
+  muzzle), each with two options plus none, picked before deploying and
+  saved locally. Every choice is a real stat trade-off applied across the
+  arsenal: e.g. the 3× scope tightens ADS zoom but slows you, the extended
+  mag holds 40% more at slower reloads, the compensator shrinks spread,
+  the vertical grip tames recoil.
 
 ## Killstreak rewards
 
@@ -220,8 +228,9 @@ cover, a roofed hangar bay, and hoverbike pads.
 
 ## Roadmap
 
-Next up: bot fill in online rooms, weapon attachments, drivable
-helicopters/tanks, larger rooms (8+), and quick-play matchmaking.
+Next up: bot fill in online rooms, drivable helicopters/tanks, an
+expanded killstreak ladder (UAV, airstrike, care package), and
+skill-based matchmaking with parties.
 
 ## Tech notes
 

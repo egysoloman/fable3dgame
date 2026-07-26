@@ -13,7 +13,9 @@ const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
 // Injected into index.html as the client's default server address
 const DEFAULT_SERVER_ADDRESS = process.env.DEFAULT_SERVER_ADDRESS || '';
 const ROOT = path.join(__dirname, '..');
-const MAX_PLAYERS = 4;
+// Room capacity: default 8, raise up to 16 with MAX_PLAYERS
+const MAX_PLAYERS = Math.min(16,
+  Math.max(2, parseInt(process.env.MAX_PLAYERS || '8', 10) || 8));
 const MAX_ROOMS = 200;
 const MAX_MSG_BYTES = 32 * 1024;
 
@@ -201,6 +203,34 @@ wss.on('connection', (ws) => {
         target.players.set(id, { name: c.name, ready: false });
         c.roomCode = code;
         broadcastRoom(target, roomStatePayload(target));
+        break;
+      }
+      case 'quick': {
+        // quick play: drop into the fullest open lobby, or open a new one
+        if (room) leaveRoom(id, false);
+        let target = null;
+        for (const r of rooms.values()) {
+          if (r.started || r.players.size >= MAX_PLAYERS) continue;
+          if (!target || r.players.size > target.players.size) target = r;
+        }
+        if (target) {
+          target.players.set(id, { name: c.name, ready: false });
+          c.roomCode = target.code;
+          broadcastRoom(target, roomStatePayload(target));
+          break;
+        }
+        if (rooms.size >= MAX_ROOMS) { send(id, { t: 'error', code: 'serverFull' }); break; }
+        const code = makeCode();
+        if (!code) { send(id, { t: 'error', code: 'serverFull' }); break; }
+        const newRoom = {
+          code,
+          players: new Map([[id, { name: c.name, ready: false }]]),
+          hostId: id,
+          started: false,
+        };
+        rooms.set(code, newRoom);
+        c.roomCode = code;
+        send(id, roomStatePayload(newRoom));
         break;
       }
       case 'leave': {

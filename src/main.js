@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
-import { WeaponSystem } from './weapons.js';
+import { WeaponSystem, ATTACHMENTS } from './weapons.js';
 import { EnemyManager } from './enemies.js';
 import { PickupManager } from './pickups.js';
 import { Effects } from './effects.js';
@@ -252,6 +252,12 @@ class Game {
         for (const eq of EQUIP_DEFS) {
           $(`eq-${eq}`).classList.toggle('sel', game.setup.equip.includes(eq));
         }
+        for (const slot of Object.keys(ATTACHMENTS)) {
+          const id = game.weapons.attachments[slot];
+          const btn = $(`attach-${slot}`);
+          btn.textContent = `${t(`attach.${slot}`)}: ${t(`attach.${id}`)}`;
+          btn.classList.toggle('sel', id !== 'none');
+        }
       },
       saveSetup() {
         try {
@@ -358,6 +364,10 @@ class Game {
       game.mp.setName($('name-input').value);
       game.mp.createRoom();
     });
+    $('quickplay-btn').addEventListener('click', () => {
+      game.mp.setName($('name-input').value);
+      game.mp.quickPlay();
+    });
     $('join-code-btn').addEventListener('click', () => {
       game.mp.setName($('name-input').value);
       const code = $('room-code-input').value.trim().toUpperCase();
@@ -412,6 +422,14 @@ class Game {
     });
     for (const m of ['arena', 'battlefield', 'station', 'carrier']) {
       $(`map-${m}`).addEventListener('click', () => { game.setup.map = m; ui.saveSetup(); });
+    }
+    for (const slot of Object.keys(ATTACHMENTS)) {
+      $(`attach-${slot}`).addEventListener('click', () => {
+        const opts = ATTACHMENTS[slot];
+        const i = opts.findIndex((o) => o.id === game.weapons.attachments[slot]);
+        game.weapons.setAttachment(slot, opts[(i + 1) % opts.length].id);
+        ui.renderSetup();
+      });
     }
     for (const eq of EQUIP_DEFS) {
       $(`eq-${eq}`).addEventListener('click', () => {

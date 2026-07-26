@@ -109,6 +109,54 @@ export const WEAPON_DEFS = [
 
 const GRENADE = { fuse: 2.2, splashRadius: 5, splashDmg: 110, throwSpeed: 17, max: 5 };
 
+// Attachment system: one option per slot, chosen pre-match, multiplies the
+// arsenal's stats. Omitted fields default to 1 (neutral).
+export const ATTACHMENTS = {
+  optic: [
+    { id: 'none' },
+    { id: 'reflex', adsSpeed: 1.3 },
+    { id: 'scope3x', adsFov: 0.7, move: 0.97 },
+  ],
+  barrel: [
+    { id: 'none' },
+    { id: 'longbarrel', dmg: 1.08, move: 0.97 },
+    { id: 'lightbarrel', move: 1.04, spread: 1.1 },
+  ],
+  mag: [
+    { id: 'none' },
+    { id: 'extmag', mag: 1.4, reload: 1.15 },
+    { id: 'fastmag', reload: 0.8 },
+  ],
+  grip: [
+    { id: 'none' },
+    { id: 'vgrip', recoil: 0.75 },
+    { id: 'stubby', spread: 0.85 },
+  ],
+  muzzle: [
+    { id: 'none' },
+    { id: 'comp', spread: 0.85 },
+    { id: 'brake', recoil: 0.8, spread: 1.08 },
+  ],
+};
+const ATTACH_KEY = 'neonstrike.attach';
+
+export function loadAttachments() {
+  const out = {};
+  try {
+    const st = JSON.parse(localStorage.getItem(ATTACH_KEY) || '{}');
+    for (const slot of Object.keys(ATTACHMENTS)) {
+      out[slot] = ATTACHMENTS[slot].some((o) => o.id === st[slot]) ? st[slot] : 'none';
+    }
+  } catch (e) {
+    for (const slot of Object.keys(ATTACHMENTS)) out[slot] = 'none';
+  }
+  return out;
+}
+
+export function saveAttachments(sel) {
+  try { localStorage.setItem(ATTACH_KEY, JSON.stringify(sel)); } catch (e) { /* ok */ }
+}
+
 function buildViewModel(def) {
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({ color: def.bodyColor, roughness: 0.5, metalness: 0.7 });
@@ -167,6 +215,7 @@ function buildViewModel(def) {
 class Weapon {
   constructor(def) {
     this.def = def;
+    this.capacity = def.magSize;   // attachment-modified magazine size
     this.ammo = def.magSize;
     this.reserve = def.reserve;
     this.cooldown = 0;
@@ -180,7 +229,7 @@ class Weapon {
   }
 
   refill() {
-    this.ammo = this.def.magSize;
+    this.ammo = this.capacity;
     this.reserve = this.def.reserve;
     this.reloading = false;
     this.cooldown = 0;
@@ -314,6 +363,9 @@ export class WeaponSystem {
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = 300;
 
+    this.attachments = loadAttachments();
+    this.mods = { dmg: 1, mag: 1, reload: 1, spread: 1, recoil: 1, adsFov: 1, move: 1, adsSpeed: 1 };
+
     this.rig = new THREE.Group();
     this.rig.position.copy(HIP_POS);
     this.camera.add(this.rig);
@@ -322,6 +374,7 @@ export class WeaponSystem {
       this.rig.add(w.model);
     }
     this.current.model.visible = true;
+    this._recomputeMods();
 
     this.recoilOffset = 0;
     this.swayTime = 0;
@@ -374,6 +427,34 @@ export class WeaponSystem {
 
   get current() {
     return this.weapons[this.index];
+  }
+
+  _recomputeMods() {
+    const m = { dmg: 1, mag: 1, reload: 1, spread: 1, recoil: 1, adsFov: 1, move: 1, adsSpeed: 1 };
+    for (const slot of Object.keys(ATTACHMENTS)) {
+      const opt = ATTACHMENTS[slot].find((o) => o.id === this.attachments[slot]);
+      if (!opt) continue;
+      for (const k of Object.keys(m)) {
+        if (opt[k] !== undefined) m[k] *= opt[k];
+      }
+    }
+    this.mods = m;
+    for (const w of this.weapons) {
+      w.capacity = Math.round(w.def.magSize * m.mag);
+      w.ammo = Math.min(w.ammo, w.capacity);
+    }
+  }
+
+  setAttachment(slot, id) {
+    if (!ATTACHMENTS[slot] || !ATTACHMENTS[slot].some((o) => o.id === id)) return;
+    this.attachments[slot] = id;
+    saveAttachments(this.attachments);
+    this._recomputeMods();
+    this.updateHud();
+  }
+
+  effAdsFov() {
+    return Math.max(18, this.current.def.adsFov * this.mods.adsFov);
   }
 
   grantRailgun() {
@@ -430,11 +511,11 @@ export class WeaponSystem {
 
   startReload() {
     const w = this.current;
-    if (w.reloading || w.ammo >= w.def.magSize || w.reserve <= 0) return;
+    if (w.reloading || w.ammo >= w.capacity || w.reserve <= 0) return;
     const cheats = this.game.cheats;
     if (cheats && cheats.is('noReload')) {
       // instant reload: still consumes reserve, skips the animation
-      const need = w.def.magSize - w.ammo;
+      const need = w.capacity - w.ammo;
       const take = w.reserve === Infinity ? need : Math.min(need, w.reserve);
       w.ammo += take;
       if (w.reserve !== Infinity) w.reserve -= take;
@@ -443,7 +524,7 @@ export class WeaponSystem {
       return;
     }
     w.reloading = true;
-    w.reloadTotal = w.def.reloadTime * this.game.progression.reloadMul();
+    w.reloadTotal = w.def.reloadTime * this.game.progression.reloadMul() * this.mods.reload;
     w.reloadTimer = w.reloadTotal;
     this.game.audio.reload(w.def.id);
     this.updateHud();
@@ -476,7 +557,8 @@ export class WeaponSystem {
     const p = this.game.player;
     const moveFactor = Math.min(1, Math.hypot(p.velocity.x, p.velocity.z) / 6) * 0.6;
     const crouchFactor = p.crouchAmount * -0.25;
-    return Math.max(0.0004, base * (1 + moveFactor + crouchFactor) + w.bloom);
+    return Math.max(0.0004,
+      base * this.mods.spread * (1 + moveFactor + crouchFactor) + w.bloom);
   }
 
   get sprintBlocked() {
@@ -500,9 +582,10 @@ export class WeaponSystem {
     w.cooldown = w.def.fireDelay;
     w.bloom = Math.min(w.def.bloom * 6, w.bloom + w.def.bloom);
     this.game.audio.shot(w.def.sound);
-    this.recoilOffset = Math.min(0.22, this.recoilOffset + w.def.recoil * 1.6);
+    this.recoilOffset = Math.min(0.22,
+      this.recoilOffset + w.def.recoil * this.mods.recoil * 1.6);
     const player = this.game.player;
-    player.pitch += w.def.kick * (1 - this.adsAmount * 0.4);
+    player.pitch += w.def.kick * this.mods.recoil * (1 - this.adsAmount * 0.4);
     const pitchLim = Math.PI / 2 - 0.01;
     player.pitch = Math.max(-pitchLim, Math.min(pitchLim, player.pitch));
     this.flashTimer = 0.05;
@@ -573,7 +656,7 @@ export class WeaponSystem {
         this.game.effects.tracer(muzzlePos, end, w.def.tracer);
 
         for (const q of pierced) {
-          const dmg = w.def.damage * (q.headshot ? w.def.headshotMul : 1) *
+          const dmg = w.def.damage * this.mods.dmg * (q.headshot ? w.def.headshotMul : 1) *
             this.game.progression.damageMul();
           q.enemy.takeDamage(dmg, q.point, q.headshot);
         }
@@ -581,11 +664,11 @@ export class WeaponSystem {
           this.game.effects.enemyHitSparks(end);
           this.game.hud.hitmarker(false);
           this.game.audio.hit(false);
-          this.game.mp.sendPvpHit(hitRp.id, w.def.damage * 0.8, end);
+          this.game.mp.sendPvpHit(hitRp.id, w.def.damage * this.mods.dmg * 0.8, end);
         } else if (hitEnemyPart) {
           const enemy = hitEnemyPart.userData.enemy;
           const headshot = !!hitEnemyPart.userData.headshot;
-          const dmg = w.def.damage * (headshot ? w.def.headshotMul : 1) *
+          const dmg = w.def.damage * this.mods.dmg * (headshot ? w.def.headshotMul : 1) *
             this.game.progression.damageMul();
           enemy.takeDamage(dmg, end, headshot);
         } else if (end) {
@@ -633,13 +716,14 @@ export class WeaponSystem {
 
     // ADS blend (blocked while sprinting hard or reloading the launcher)
     const wantAds = this.ads && !this.game.player.sprintingHard && this.game.playing;
-    this.adsAmount += ((wantAds ? 1 : 0) - this.adsAmount) * Math.min(1, dt * 10);
+    this.adsAmount += ((wantAds ? 1 : 0) - this.adsAmount) *
+      Math.min(1, dt * 10 * this.mods.adsSpeed);
     if (this.adsAmount < 0.001) this.adsAmount = 0;
 
     if (w.reloading) {
       w.reloadTimer -= dt;
       if (w.reloadTimer <= 0) {
-        const need = w.def.magSize - w.ammo;
+        const need = w.capacity - w.ammo;
         const take = w.reserve === Infinity ? need : Math.min(need, w.reserve);
         w.ammo += take;
         if (w.reserve !== Infinity) w.reserve -= take;

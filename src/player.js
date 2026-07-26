@@ -126,7 +126,7 @@ export class Player {
     }
 
     const weapons = this.game.weapons;
-    const moveMul = (weapons ? weapons.current.def.moveMul : 1) *
+    const moveMul = (weapons ? weapons.current.def.moveMul * weapons.mods.move : 1) *
       (1 - (weapons ? weapons.adsAmount : 0) * 0.25) *
       (1 - this.crouchAmount * 0.45);
     const boots = this.game.hasEquip && this.game.hasEquip('boots') ? 1.08 : 1;
@@ -271,7 +271,7 @@ export class Player {
       let targetFov = 75;
       if (this.sprintingHard) targetFov = 82;
       if (this.game.weapons && ads > 0.01) {
-        targetFov = 75 + (this.game.weapons.current.def.adsFov - 75) * ads;
+        targetFov = 75 + (this.game.weapons.effAdsFov() - 75) * ads;
       }
       this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 10);
       this.camera.updateProjectionMatrix();

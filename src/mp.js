@@ -476,6 +476,7 @@ export class Multiplayer {
   // ---- lobby actions (wired to UI in main.js) ----
   listRooms() { this.send({ t: 'list' }); }
   createRoom() { this.send({ t: 'create' }); }
+  quickPlay() { this.send({ t: 'quick' }); }
   joinRoom(code) { this.send({ t: 'join', code }); }
   leaveRoom() { this.send({ t: 'leave' }); }
   setReady(v) { this.send({ t: 'ready', v }); }
