@@ -8,11 +8,19 @@ import { t } from './i18n.js';
 // driven by the same perception/aim pipeline as the Strike soldiers but
 // parameterized by a difficulty preset. Used to fill Versus (FFA) offline.
 
+// Each tier also gates the tactical repertoire (see docs/AI.md):
+// easy fights in the open; normal takes cover and flanks occasionally;
+// hard adds retreats and peek-firing; expert runs the full suite with
+// suppression fire and coordinated team advances.
 export const DIFFICULTY = {
-  easy:   { aimStart: 0.20, aimFloor: 0.055, tighten: 0.04, react: 0.75, pause: 1.3, grenade: 0.002, speed: 0.85, hpMul: 0.85 },
-  normal: { aimStart: 0.14, aimFloor: 0.030, tighten: 0.06, react: 0.45, pause: 0.85, grenade: 0.004, speed: 0.95, hpMul: 1.0 },
-  hard:   { aimStart: 0.10, aimFloor: 0.020, tighten: 0.09, react: 0.28, pause: 0.55, grenade: 0.007, speed: 1.0, hpMul: 1.1 },
-  expert: { aimStart: 0.07, aimFloor: 0.012, tighten: 0.13, react: 0.16, pause: 0.35, grenade: 0.010, speed: 1.05, hpMul: 1.2 },
+  easy:   { aimStart: 0.20, aimFloor: 0.055, tighten: 0.04, react: 0.75, pause: 1.3, grenade: 0.002, speed: 0.85, hpMul: 0.85,
+    tactics: {} },
+  normal: { aimStart: 0.14, aimFloor: 0.030, tighten: 0.06, react: 0.45, pause: 0.85, grenade: 0.004, speed: 0.95, hpMul: 1.0,
+    tactics: { cover: true, flank: 0.5 } },
+  hard:   { aimStart: 0.10, aimFloor: 0.020, tighten: 0.09, react: 0.28, pause: 0.55, grenade: 0.007, speed: 1.0, hpMul: 1.1,
+    tactics: { cover: true, flank: 1, retreat: true, peek: true } },
+  expert: { aimStart: 0.07, aimFloor: 0.012, tighten: 0.13, react: 0.16, pause: 0.35, grenade: 0.010, speed: 1.05, hpMul: 1.2,
+    tactics: { cover: true, flank: 1, retreat: true, peek: true, suppress: true, coordinate: true } },
 };
 
 const BOT_NAMES = ['ROOK', 'HALO', 'ONYX', 'DRIFT', 'NOVA-7', 'JINX', 'SABLE'];
@@ -89,6 +97,17 @@ export class BotPlayer {
     this.kills = 0;
     this.streak = 0;
 
+    // tactical state (repertoire gated by diff.tactics)
+    this.flankSign = Math.random() < 0.5 ? -1 : 1;
+    this.tacticTimer = Math.random() * 3;
+    this.tacticState = 'assault';   // assault | flank | retreat | peek | overwatch
+    this.role = 'advance';          // advance | overwatch (coordinated teams)
+    this.lastSeenPos = new THREE.Vector3();
+    this.lastSeenAge = 999;
+    this.coverTimer = 0;
+    this.coverDir = new THREE.Vector3();
+    this.suppressTimer = 0;
+
     const body = buildEnemyBody({ color, eyeColor: 0xffe0b0 }, true);
     this.parts = body;
     this.group = body.group;
@@ -159,6 +178,60 @@ export class BotPlayer {
     _ray.set(from.clone(), dir);
     _ray.far = dist;
     return _ray.intersectObjects(this.game.world.colliderMeshes, false).length === 0;
+  }
+
+  // Retreat helper: probe left/back/right and steer down the first path
+  // whose endpoint the target can no longer see (recomputed at 2 Hz).
+  _steerToCover(move, toT, dt) {
+    this.coverTimer -= dt;
+    if (this.coverTimer <= 0) {
+      this.coverTimer = 0.5;
+      const from = new THREE.Vector3(
+        this.target.position.x, this.target.position.y + 1.5, this.target.position.z);
+      const perp = new THREE.Vector3(-toT.z, 0, toT.x);
+      const cands = [
+        move.clone(),
+        move.clone().addScaledVector(perp, 1.2),
+        move.clone().addScaledVector(perp, -1.2),
+      ];
+      this.coverDir.copy(move);
+      for (const c of cands) {
+        if (c.lengthSq() < 0.001) continue;
+        c.normalize();
+        const probe = new THREE.Vector3(
+          this.position.x + c.x * 6, 1.2, this.position.z + c.z * 6);
+        const dir = probe.clone().sub(from);
+        const d = dir.length();
+        dir.normalize();
+        _ray.set(from, dir);
+        _ray.far = d;
+        if (_ray.intersectObjects(this.game.world.colliderMeshes, false).length > 0) {
+          this.coverDir.copy(c);
+          break;
+        }
+      }
+    }
+    move.copy(this.coverDir);
+  }
+
+  // Suppression: keep rounds cracking over the last known position so the
+  // pinned side eats flinch while teammates reposition. No aim cheat — the
+  // burst goes where the target WAS.
+  _suppressShot() {
+    this.mag--;
+    const from = new THREE.Vector3(this.position.x, this.position.y + 1.5, this.position.z);
+    const aim = new THREE.Vector3(
+      this.lastSeenPos.x + (Math.random() - 0.5) * 1.8,
+      this.lastSeenPos.y + 1.2,
+      this.lastSeenPos.z + (Math.random() - 0.5) * 1.8);
+    const dir = aim.sub(from).normalize();
+    _ray.set(from, dir);
+    _ray.far = 60;
+    const hits = _ray.intersectObjects(this.game.world.colliderMeshes, false);
+    const end = from.clone().addScaledVector(dir, hits.length ? hits[0].distance : 60);
+    this.game.effects.tracer(from, end, this.weapon.tracer);
+    this.game.effects.impactSparks(end.clone());
+    this.game.audio.remoteShot();
   }
 
   _fireShot(tgt) {
@@ -286,6 +359,26 @@ export class BotPlayer {
     if (this.hasLOS) {
       this.aimError = Math.max(this.diff.aimFloor, this.aimError - this.diff.tighten * dt);
       if (this.acquireDelay > 0) this.acquireDelay -= dt;
+      if (this.target) {
+        this.lastSeenPos.copy(this.target.position);
+        this.lastSeenAge = 0;
+      }
+    } else {
+      this.lastSeenAge += dt;
+    }
+
+    // tactic clock: re-roll the flank arc; coordinated teams alternate
+    // advance / overwatch roles so someone always covers the push
+    const tac = this.diff.tactics || {};
+    this.tacticTimer -= dt;
+    if (this.tacticTimer <= 0) {
+      this.tacticTimer = 5 + Math.random() * 3;
+      if (Math.random() < 0.5) this.flankSign *= -1;
+      if (tac.coordinate && this.team && this.match.bots) {
+        const mates = this.match.bots.filter((b) => b.team === this.team && b.alive);
+        const idx = Math.max(0, mates.indexOf(this));
+        this.role = this.role === 'advance' && idx % 2 === 0 ? 'overwatch' : 'advance';
+      }
     }
 
     // movement: keep preferred range, strafe
@@ -309,20 +402,45 @@ export class BotPlayer {
         this.target.position.x - this.position.x, 0, this.target.position.z - this.position.z);
       dist = toT.length();
       if (dist > 0.001) toT.divideScalar(dist);
-      const pref = RANGE_PREF[this.weapon.id];
-      if (this.reloadTimer > 0) {
+      const pref = RANGE_PREF[this.weapon.id] || 14;
+      const lowHp = this.hp < this.maxHp * 0.35;
+      if (lowHp && tac.retreat) {
+        // outmatched: break contact and slide into cover to let regen work
+        this.tacticState = 'retreat';
         move.copy(toT).negate();
+        if (tac.cover) this._steerToCover(move, toT, dt);
+      } else if (this.reloadTimer > 0) {
+        // reloading: back off, into cover when the tier knows how
+        this.tacticState = 'retreat';
+        move.copy(toT).negate();
+        if (tac.cover) this._steerToCover(move, toT, dt);
+      } else if (!this.hasLOS && tac.peek && this.lastSeenAge < 2.5) {
+        // contact just broke: sidestep around the cover to re-acquire
+        this.tacticState = 'peek';
+        move.set(-toT.z, 0, toT.x).multiplyScalar(this.flankSign);
+        move.addScaledVector(toT, 0.35);
       } else if (!this.hasLOS && this.objective) {
         // push the objective instead of chasing ghosts
+        this.tacticState = 'assault';
         const toO = new THREE.Vector3(
           this.objective.x - this.position.x, 0, this.objective.z - this.position.z);
         if (toO.length() > 2.2) move.copy(toO.normalize());
       } else if (!this.hasLOS) {
+        this.tacticState = 'assault';
         move.copy(toT);
+      } else if (this.role === 'overwatch' && dist < 42 && !this.objective) {
+        // covering the push: hold ground and lay steady fire
+        this.tacticState = 'overwatch';
+        move.addScaledVector(new THREE.Vector3(-toT.z, 0, toT.x), this.strafeSign * 0.6);
       } else {
+        // engaged: keep preferred range; flanking tiers swing a wide,
+        // persistent arc toward the target's side instead of pushing straight
+        const arcW = 0.9 + (tac.flank || 0) * 1.1;
+        this.tacticState = tac.flank ? 'flank' : 'assault';
         if (dist > pref * 1.4) move.copy(toT);
         else if (dist < pref * 0.6) move.copy(toT).negate();
-        move.addScaledVector(new THREE.Vector3(-toT.z, 0, toT.x), this.strafeSign * 0.9);
+        move.addScaledVector(new THREE.Vector3(-toT.z, 0, toT.x),
+          (tac.flank ? this.flankSign : this.strafeSign) * arcW);
       }
       if (move.lengthSq() > 0.001) move.normalize();
       g.rotation.y = Math.atan2(toT.x, toT.z);
@@ -371,6 +489,14 @@ export class BotPlayer {
           this.pauseTimer = this.diff.pause * (0.7 + Math.random() * 0.6);
           this.shotTimer = 0;
         }
+      }
+    } else if (!this.hasLOS && tac.suppress && this.target &&
+        this.lastSeenAge < 2.2 && this.mag > 6) {
+      // expert tier: suppress the last known position
+      this.suppressTimer -= dt;
+      if (this.suppressTimer <= 0) {
+        this.suppressTimer = 0.32 + Math.random() * 0.3;
+        this._suppressShot();
       }
     }
 

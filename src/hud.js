@@ -93,6 +93,16 @@ export class HUD {
     });
   }
 
+  setOrbital(charges, inTacticalView) {
+    const el = document.getElementById('orbital-note');
+    if (!charges || inTacticalView) {
+      el.classList.remove('visible');
+      return;
+    }
+    el.classList.add('visible');
+    el.textContent = t('orbital.note', { n: charges });
+  }
+
   setOob(secondsLeft) {
     const el = this.el.oobWarning;
     if (secondsLeft === null || secondsLeft === undefined) {

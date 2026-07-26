@@ -60,6 +60,7 @@ class SoldierBot {
     // movement
     this.state = 'engage'; // engage | cover | hunt
     this.strafeSign = Math.random() < 0.5 ? -1 : 1;
+    this.flankSign = Math.random() < 0.5 ? -1 : 1;
     this.strafeFlip = 2 + Math.random() * 2;
     this.coverSpot = null;
     this.walkPhase = Math.random() * 10;
@@ -221,8 +222,10 @@ class SoldierBot {
       if (this.acquireDelay > 0) this.acquireDelay -= dt;
     }
 
-    // --- state transitions ---
-    if (this.reloadTimer > 0) {
+    // --- state transitions (tactics gated by difficulty tier) ---
+    const tac = this.diff.tactics || {};
+    const lowHp = this.hp < this.maxHp * 0.35;
+    if (this.reloadTimer > 0 || (lowHp && tac.retreat)) {
       this.state = 'cover';
     } else if (this.hasLOS) {
       this.state = 'engage';
@@ -235,6 +238,7 @@ class SoldierBot {
     if (this.strafeFlip <= 0) {
       this.strafeFlip = 1.6 + Math.random() * 2;
       this.strafeSign *= -1;
+      if (Math.random() < 0.3) this.flankSign *= -1;
     }
     const toP = _v1.set(p.position.x - this.position.x, 0, p.position.z - this.position.z);
     const dist = toP.length();
@@ -246,9 +250,16 @@ class SoldierBot {
     if (this.state === 'engage') {
       if (dist > pref * 1.4) move.copy(toP);
       else if (dist < pref * 0.6) move.copy(toP).negate();
-      move.addScaledVector(perp, 0.9);
+      if (tac.flank) {
+        // persistent wide arc toward the player's side
+        move.addScaledVector(new THREE.Vector3(-toP.z, 0, toP.x),
+          this.flankSign * (0.9 + tac.flank * 0.9));
+      } else {
+        move.addScaledVector(perp, 0.9);
+      }
     } else if (this.state === 'cover') {
-      if (!this.coverSpot) this.coverSpot = this._findCover();
+      // easy tier backs off in the open; the rest actually find cover
+      if (tac.cover && !this.coverSpot) this.coverSpot = this._findCover();
       if (this.coverSpot) {
         const toCover = new THREE.Vector3(
           this.coverSpot.x - this.position.x, 0, this.coverSpot.z - this.position.z);

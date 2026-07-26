@@ -116,11 +116,13 @@ Clicking **SOLO** opens mission setup:
   **Hoverbikes**: W/S throttle, A/D steer, ram enemies at speed.
   **Battle tank** (600 hull): slow and enclosed — incoming damage hits the
   hull, the turret tracks your camera, click lobs splash shells, and the
-  tracks crush anything you drive over. **Gunship helicopter** (350 hull):
-  W/S pitch, A/D turn, SPACE/CTRL altitude, click fires the chin gun
-  through your crosshair. Every vehicle has its own health pool, can be
-  destroyed (ejecting the rider), and respawns on its pad; positions and
-  destruction replicate in multiplayer.
+  tracks crush anything you drive over. **Gunship helicopter** (350
+  hull): a big airframe with stub wings and rocket pods, flown from a
+  **belly-gunner camera slung below the aircraft** — W/S pitch, A/D
+  turn, SPACE/CTRL altitude, LMB fires the chin gun through your
+  crosshair, RMB launches a rocket volley. Every vehicle has its own
+  health pool, can be destroyed (ejecting the rider), and respawns on
+  its pad; positions and destruction replicate in multiplayer.
 - **Weapon attachments** — five slots (optic, barrel, magazine, grip,
   muzzle), each with two options plus none, picked before deploying and
   saved locally. Every choice is a real stat trade-off applied across the
@@ -133,7 +135,7 @@ Clicking **SOLO** opens mission setup:
 | Streak | Reward |
 | --- | --- |
 | 5 | Resupply drop (ammo, grenade, armor plates) |
-| 7 | **Orbital railgun** — press `0` for a top-down tactical view, steer the reticle with the mouse and click to call 3 railgun lances from orbit with heavy AOE splash |
+| 7 | **Orbital railgun** — press `0` for a top-down tactical view, steer the reticle with the mouse and click to call 3 railgun lances from orbit with heavy AOE splash. Full spectacle: charge-up hum with a converging glow ring, a slim light-strip beam from orbit, a thunderclap impact with screen shake, and a HUD charge indicator |
 | 10 | Full ammo refill |
 | 12 | **Attack helicopter** escorts you for 30 s |
 | 15 / 20 | Big score bonuses |
@@ -257,7 +259,14 @@ clients.
 Mission setup (and the co-op lobby, host-controlled) offers **Easy /
 Normal / Hard / Expert** AI difficulty — it drives the soldiers' aim
 cone, reaction delay, burst cadence, grenade usage, and speed (and wave
-HP/speed in Survival; see [docs/AI.md](docs/AI.md)). **Versus** is now
+HP/speed in Survival), **and their tactical repertoire**: easy fights in
+the open, normal takes cover and flanks occasionally, hard adds
+cover-seeking retreats below 35% HP and peek-firing around lost
+contacts, and expert runs the full suite — persistent flanking arcs,
+suppression fire over last-known positions, and coordinated
+advance/overwatch team roles. Flashbangs stun AI and smoke blocks every
+AI sight line. The full algorithm is documented in
+[docs/AI.md](docs/AI.md). **Versus** is now
 also playable solo: three bot players with real weapons, armor, regen,
 respawns, and scoreboard entries fill the FFA — first to 15 kills.
 **Domination** is a true team fight: a 3-bot enemy squad pushes,

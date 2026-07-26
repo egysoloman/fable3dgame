@@ -50,6 +50,7 @@ class Helicopter {
     this.rotor = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.06, 0.3), mat);
     this.rotor.position.y = 0.75;
     g.add(this.rotor);
+    g.scale.setScalar(1.35);
     this.group = g;
     game.scene.add(g);
   }
@@ -197,6 +198,7 @@ class Vehicle {
     if (p.vehicle === this) {
       p.vehicle = null;
       this.mounted = false;
+      if (this.onDismount) this.onDismount();
       this.game.weapons.rig.visible = true;
       p.takeDamage(30, pos, 'splash');
       if (this.game.mp.active) this.game.mp.sendBikeState(this.index, false);
@@ -243,7 +245,47 @@ class Vehicle {
     p.syncCamera(dt);
   }
 
+  // shared projectile machinery for vehicles with cannons/rocket pods
+  _stepShells(dt, radius, dmg) {
+    if (!this.shells) return;
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const s = this.shells[i];
+      s.life -= dt;
+      let boom = s.life <= 0;
+      const steps = 3;
+      for (let k = 0; k < steps && !boom; k++) {
+        s.pos.addScaledVector(s.vel, dt / steps);
+        s.vel.y -= (s.grav || 9) * dt / steps;
+        boom = this._shellHit(s.pos);
+      }
+      s.mesh.position.copy(s.pos);
+      if (boom) {
+        this.game.scene.remove(s.mesh);
+        this.shells.splice(i, 1);
+        this.game.applySplash(s.pos.clone(), radius, dmg);
+      }
+    }
+  }
+
+  _shellHit(pos) {
+    if (pos.y <= 0.06) return true;
+    for (const c of this.game.world.colliders) {
+      if (pos.x > c.min.x && pos.x < c.max.x && pos.y > c.min.y &&
+          pos.y < c.max.y && pos.z > c.min.z && pos.z < c.max.z) return true;
+    }
+    for (const e of this.game.enemies.list) {
+      if (!e.alive || e.spawnTimer > 0) continue;
+      if (Math.hypot(e.position.x - pos.x, e.position.z - pos.z) < 1.3 &&
+          pos.y < e.position.y + e.height + 0.5) return true;
+    }
+    return false;
+  }
+
   dispose() {
+    if (this.shells) {
+      for (const s of this.shells) this.game.scene.remove(s.mesh);
+      this.shells = [];
+    }
     this.game.scene.remove(this.group);
   }
 }
@@ -426,43 +468,7 @@ class Tank extends Vehicle {
 
   passive(dt) {
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
-    for (let i = this.shells.length - 1; i >= 0; i--) {
-      const s = this.shells[i];
-      s.life -= dt;
-      let boom = s.life <= 0;
-      const steps = 3;
-      for (let k = 0; k < steps && !boom; k++) {
-        s.pos.addScaledVector(s.vel, dt / steps);
-        s.vel.y -= 9 * dt / steps;
-        boom = this._shellHit(s.pos);
-      }
-      s.mesh.position.copy(s.pos);
-      if (boom) {
-        this.game.scene.remove(s.mesh);
-        this.shells.splice(i, 1);
-        this.game.applySplash(s.pos.clone(), 6, 95);
-      }
-    }
-  }
-
-  _shellHit(pos) {
-    if (pos.y <= 0.06) return true;
-    for (const c of this.game.world.colliders) {
-      if (pos.x > c.min.x && pos.x < c.max.x && pos.y > c.min.y &&
-          pos.y < c.max.y && pos.z > c.min.z && pos.z < c.max.z) return true;
-    }
-    for (const e of this.game.enemies.list) {
-      if (!e.alive || e.spawnTimer > 0) continue;
-      if (Math.hypot(e.position.x - pos.x, e.position.z - pos.z) < 1.3 &&
-          pos.y < e.position.y + e.height + 0.5) return true;
-    }
-    return false;
-  }
-
-  dispose() {
-    for (const s of this.shells) this.game.scene.remove(s.mesh);
-    this.shells = [];
-    super.dispose();
+    this._stepShells(dt, 6, 95);
   }
 }
 
@@ -474,12 +480,25 @@ class AttackHeli extends Vehicle {
     this.type = 'heli';
     this.maxHp = 350;
     this.enclosed = true;
-    this.seatY = 1.15;
-    this.mountRadius = 3.2;
-    this.colHalf = 1.4;
-    this.colHeight = 1.8;
+    this.seatY = 1.5;
+    this.mountRadius = 4.2;
+    this.colHalf = 2.0;
+    this.colHeight = 2.5;
     this.bobAmp = 0.04;
     this.ctlKey = 'vehicle.heliCtl';
+    this.shells = [];
+    this.rocketCooldown = 0;
+  }
+
+  // belly-gunner camera: hang below the airframe with a clear view down;
+  // the aircraft itself stays out of frame above you
+  _seatRider(dt) {
+    const p = this.game.player;
+    p.position.set(this.position.x,
+      Math.max(0.15, this.position.y - 2.1), this.position.z);
+    p.velocity.set(0, 0, 0);
+    this._sync(dt);
+    p.syncCamera(dt);
   }
 
   _build() {
@@ -507,6 +526,17 @@ class AttackHeli extends Vehicle {
     this.rotor = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.06, 0.32), mat);
     this.rotor.position.y = 1.75;
     g.add(this.rotor);
+    // stub wings with rocket pods
+    for (const sx of [-1.1, 1.1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 0.5), mat);
+      wing.position.set(sx, 0.9, -0.4);
+      g.add(wing);
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 8), glow);
+      pod.rotation.x = Math.PI / 2;
+      pod.position.set(sx * 1.35, 0.75, -0.5);
+      g.add(pod);
+    }
+    g.scale.setScalar(1.45); // an imposing airframe
     return g;
   }
 
@@ -520,7 +550,9 @@ class AttackHeli extends Vehicle {
     this.speed *= Math.max(0, 1 - 0.5 * dt);
     this.speed = Math.max(-9, Math.min(17, this.speed));
     this.yaw += steer * dt * 1.5;
-    this.position.y = Math.max(0.2, Math.min(24, this.position.y + lift * 6.5 * dt));
+    // auto-hover: while flown, stay high enough for the belly camera
+    this.position.y = Math.max(this.mounted ? 2.4 : 0.2,
+      Math.min(24, this.position.y + lift * 6.5 * dt));
 
     this._moveAxis('x', -Math.sin(this.yaw) * this.speed * dt);
     this._moveAxis('z', -Math.cos(this.yaw) * this.speed * dt);
@@ -547,9 +579,8 @@ class AttackHeli extends Vehicle {
     const targets = [...g.world.colliderMeshes, ...g.enemies.aliveGroups()];
     if (g.mp && g.mp.versus) targets.push(...g.mp.pvpTargets());
     const hits = _ray.intersectObjects(targets, true);
-    const muzzle = this.position.clone();
-    muzzle.y += 0.9;
-    muzzle.addScaledVector(dir, 2.2);
+    const muzzle = camPos.clone().addScaledVector(dir, 1.3);
+    muzzle.y -= 0.35; // from the chin gun under the cockpit
     let end = camPos.clone().addScaledVector(dir, 160);
     const h = hits[0];
     if (h) {
@@ -570,8 +601,36 @@ class AttackHeli extends Vehicle {
     if (g.mp.active) g.mp.sendShot(muzzle, end, 0xffd27f);
   }
 
+  // right mouse: a rocket volley from the wing pods
+  fireAlt(dt, held) {
+    if (!held || this.rocketCooldown > 0) return;
+    this.rocketCooldown = 2.6;
+    const g = this.game;
+    const dir = g.camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    for (const side of [-1, 1]) {
+      const from = this.position.clone();
+      from.y += 1.1;
+      from.addScaledVector(right, side * 1.9);
+      from.addScaledVector(dir, 2.2);
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(0.09, 0.4, 6),
+        new THREE.MeshBasicMaterial({ color: 0xc8ff8a }));
+      mesh.position.copy(from);
+      g.scene.add(mesh);
+      this.shells.push({ pos: from, vel: dir.clone().multiplyScalar(46),
+        life: 3, grav: 2, mesh });
+    }
+    g.audio.rocketFire();
+    g.player.addShake(0.12);
+    if (g.mp.active) g.mp.sendShot(this.position.clone(),
+      this.position.clone().addScaledVector(dir, 4), 0xc8ff8a);
+  }
+
   passive(dt) {
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
+    if (this.rocketCooldown > 0) this.rocketCooldown -= dt;
+    this._stepShells(dt, 5, 85);
     this.rotor.rotation.y += dt * (this.mounted || this.remoteDriven ? 30 : 2);
   }
 }
@@ -588,6 +647,7 @@ export class OrbitalRailgun {
     this.active = false;
     this.cooldown = 0;
     this.pending = [];
+    this.beams = [];
     this.reticle = null;
     this.retPos = new THREE.Vector3();
   }
@@ -595,6 +655,7 @@ export class OrbitalRailgun {
   grant(n) {
     this.charges = Math.max(this.charges, n);
     this.game.hud.killfeed(t('orbital.ready'), 'cheat');
+    this.game.hud.setOrbital(this.charges, this.active);
   }
 
   toggle() {
@@ -602,6 +663,7 @@ export class OrbitalRailgun {
     const g = this.game;
     if (this.charges <= 0 || !g.player.alive || g.player.vehicle) return;
     this.active = true;
+    g.hud.setOrbital(this.charges, true);
     this.retPos.copy(g.player.position);
     if (!this.reticle) {
       const ringGeo = new THREE.RingGeometry(7.4, 9, 48);
@@ -627,6 +689,7 @@ export class OrbitalRailgun {
       this.game.weapons.rig.visible = true;
     }
     this.game.hud.subbanner('');
+    this.game.hud.setOrbital(this.charges, false);
   }
 
   onMouse(mx, my) {
@@ -640,10 +703,20 @@ export class OrbitalRailgun {
     if (!this.active || this.charges <= 0 || this.cooldown > 0) return;
     this.cooldown = 1.1;
     this.charges--;
-    this.pending.push({ pos: this.retPos.clone(), t: 0.7 });
-    this.game.audio.remoteShot();
+    // charge-up: a converging ring glows at the strike point while the
+    // lance spins up in orbit
+    const ringGeo = new THREE.RingGeometry(0.7, 1.05, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color: 0x8af4ff, transparent: true, opacity: 0.5,
+      side: THREE.DoubleSide, depthWrite: false }));
+    ring.position.set(this.retPos.x, 0.2, this.retPos.z);
+    this.game.scene.add(ring);
+    this.pending.push({ pos: this.retPos.clone(), t: 0.7, total: 0.7, ring });
+    this.game.audio.orbitalHum();
     this.game.hud.subbanner(
       this.charges > 0 ? t('orbital.aim', { n: this.charges }) : '');
+    this.game.hud.setOrbital(this.charges, this.active);
   }
 
   update(dt) {
@@ -651,24 +724,52 @@ export class OrbitalRailgun {
     for (let i = this.pending.length - 1; i >= 0; i--) {
       const s = this.pending[i];
       s.t -= dt;
-      if (s.t > 0) continue;
+      if (s.t > 0) {
+        const k = Math.max(0.05, s.t / s.total);
+        s.ring.scale.setScalar(0.6 + k * 5);
+        s.ring.material.opacity = 0.35 + (1 - k) * 0.65;
+        s.ring.rotation.y += dt * 5;
+        continue;
+      }
       this.pending.splice(i, 1);
       const g = this.game;
-      const top = s.pos.clone();
-      top.y = 70;
-      for (let k = 0; k < 3; k++) {
-        const off = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9);
-        g.effects.tracer(top.clone().add(off), s.pos.clone().add(off), 0x62f0ff);
+      g.scene.remove(s.ring);
+      s.ring.geometry.dispose();
+      s.ring.material.dispose();
+      // the lance: a slim light strip from orbit with a thunderclap —
+      // deliberately narrow, no screen-filling glow
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0x9af6ff, transparent: true, opacity: 0.9,
+        blending: THREE.AdditiveBlending, depthWrite: false });
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.3, 84, 8, 1, true), beamMat);
+      beam.position.set(s.pos.x, 42, s.pos.z);
+      g.scene.add(beam);
+      this.beams.push({ mesh: beam, mat: beamMat, t: 0.5 });
+      if (g.mp.active) {
+        g.mp.sendShot(new THREE.Vector3(s.pos.x, 70, s.pos.z), s.pos, 0x62f0ff);
       }
-      if (g.mp.active) g.mp.sendShot(top, s.pos, 0x62f0ff);
+      g.audio.orbitalBlast();
       g.applySplash(s.pos.clone().setY(0.4), 9, 170);
-      g.player.addShake(0.2);
+      g.player.addShake(0.35);
+    }
+    // beam afterglow: hold the strip, just fade it out
+    for (let i = this.beams.length - 1; i >= 0; i--) {
+      const b = this.beams[i];
+      b.t -= dt;
+      b.mat.opacity = Math.max(0, b.t / 0.5) * 0.9;
+      if (b.t <= 0) {
+        this.game.scene.remove(b.mesh);
+        b.mesh.geometry.dispose();
+        b.mat.dispose();
+        this.beams.splice(i, 1);
+      }
     }
     if (this.active) {
       if (!this.game.player.alive) { this.exit(); return; }
       this.reticle.position.set(this.retPos.x, 0.15, this.retPos.z);
       this.reticle.rotation.y += dt * 0.8;
+      this.reticle.material.opacity = this.cooldown > 0 ? 0.3 : 0.85;
       if (this.charges <= 0 && this.pending.length === 0 && this.cooldown <= 0.4) {
         this.exit();
       }
@@ -689,7 +790,19 @@ export class OrbitalRailgun {
     this.exit();
     this.charges = 0;
     this.cooldown = 0;
+    for (const s of this.pending) {
+      this.game.scene.remove(s.ring);
+      s.ring.geometry.dispose();
+      s.ring.material.dispose();
+    }
     this.pending = [];
+    for (const b of this.beams) {
+      this.game.scene.remove(b.mesh);
+      b.mesh.geometry.dispose();
+      b.mat.dispose();
+    }
+    this.beams = [];
+    this.game.hud.setOrbital(0, false);
   }
 }
 
@@ -771,6 +884,7 @@ export class Warfare {
       const v = p.vehicle;
       v.mounted = false;
       p.vehicle = null;
+      if (v.onDismount) v.onDismount();
       if (this.game.mp.active) this.game.mp.sendBikeState(v.index, false);
       p.position.set(
         v.position.x + Math.cos(v.yaw) * (v.colHalf + 0.6), v.position.y,
@@ -786,6 +900,7 @@ export class Warfare {
       if (d < v.mountRadius) {
         p.vehicle = v;
         v.mounted = true;
+        if (v.onMount) v.onMount();
         this.game.weapons.rig.visible = false;
         this.game.weapons.triggerHeld = false;
         this.game.weapons.ads = false;
@@ -807,6 +922,7 @@ export class Warfare {
     if (p.vehicle) {
       p.vehicle.drive(dt);
       if (p.vehicle.fire) p.vehicle.fire(dt, this.game.weapons.triggerHeld);
+      if (p.vehicle.fireAlt) p.vehicle.fireAlt(dt, this.game.weapons.ads);
       this.game.hud.setVehicleHp(p.vehicle);
     } else {
       this.game.hud.setVehicleHp(null);
@@ -823,8 +939,10 @@ export class Warfare {
   }
 
   reset() {
-    if (this.game.player.vehicle) {
-      this.game.player.vehicle.mounted = false;
+    const v = this.game.player.vehicle;
+    if (v) {
+      v.mounted = false;
+      if (v.onDismount) v.onDismount();
       this.game.player.vehicle = null;
     }
     this.game.hud.setVehicleHp(null);

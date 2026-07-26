@@ -111,3 +111,43 @@ handles collision, so bots slide along walls rather than sticking.
 and fires a 3-round burst (65% hit chance per round, 14 damage) with
 visible tracers. Line of sight is honored, so enemies under bunker roofs
 are safe from it.
+
+## 7. Tactical maneuvers (difficulty-gated)
+
+AI is not a straight-line rusher: both the Strike soldiers and the bot
+"virtual players" (`src/bots.js`) pick maneuvers from a repertoire gated
+by the selected difficulty:
+
+| Difficulty | Repertoire |
+| --- | --- |
+| Easy | Basic movement only — engages in the open, backs off to reload |
+| Normal | Uses cover when reloading, occasional flanking arcs |
+| Hard | Full cover use, persistent flanking, retreats when below 35% HP, peek-fires around lost contacts |
+| Expert | Everything above plus suppression fire and coordinated team roles |
+
+Mechanics:
+
+- **Flanking** — instead of pushing straight in, flankers hold a
+  persistent side (`flankSign`, re-rolled every ~6 s) and weight their
+  approach with a wide perpendicular arc, so they arrive at the target's
+  side or rear.
+- **Cover-seeking retreat** — when reloading or below 35% HP, the bot
+  moves away from its target, probing back/left/right paths at 2 Hz and
+  choosing the first whose endpoint the target can no longer see
+  (raycast against world colliders).
+- **Peek-firing** — when line of sight breaks but the target was seen in
+  the last 2.5 s, the bot sidesteps around the obstruction to re-acquire
+  rather than waiting.
+- **Suppression (expert)** — with fresh target memory but no line of
+  sight, the bot cracks rounds over the last known position every
+  ~0.3–0.6 s (no aim cheat: it shoots where the target WAS).
+- **Team coordination (expert)** — bots on the same team alternate
+  `advance` / `overwatch` roles on the tactic clock, so one element holds
+  and fires while the other pushes.
+- **Flash & smoke aware** — flashbangs stun AI for 3 s (with LOS), and
+  smoke spheres block every AI perception raycast.
+
+## 8. Grenades
+
+All tiers can cook grenades at 8–30 m with tier-scaled probability
+(easy 0.2%/frame → expert 1%/frame while a target is held).

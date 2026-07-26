@@ -125,6 +125,12 @@
     text-shadow: 0 0 10px #9dff6a; display: none;
   }
   #vehicle-hp.visible { display: block; }
+  #orbital-note {
+    position: absolute; right: 28px; bottom: 170px;
+    font-size: 13px; letter-spacing: 2px; color: #62f0ff;
+    text-shadow: 0 0 10px #62f0ff; display: none;
+  }
+  #orbital-note.visible { display: block; }
   #oob-warning {
     position: absolute; left: 50%; top: 30%; transform: translateX(-50%);
     font-size: 20px; letter-spacing: 4px; color: #ff5a4d;
@@ -469,6 +475,7 @@
   <div id="spectate-note" data-i18n="mp.spectating"></div>
   <div id="mount-hint" data-i18n="vehicle.hint"></div>
   <div id="vehicle-hp"></div>
+  <div id="orbital-note"></div>
   <div id="oob-warning"></div>
   <div id="flash-overlay" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:60"></div>
 </div>

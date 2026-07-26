@@ -168,6 +168,26 @@ export class AudioFX {
     this._noise({ dur: 0.06, gain: 0.14, freq: 2200, freqEnd: 400 });
   }
 
+  // orbital railgun charge-up: a deep rising hum with crackling energy
+  orbitalHum() {
+    this._tone({ freq: 60, freqEnd: 220, dur: 0.7, gain: 0.4, type: 'sawtooth' });
+    this._tone({ freq: 120, freqEnd: 440, dur: 0.7, gain: 0.25, type: 'sine' });
+    this._noise({ dur: 0.5, gain: 0.12, freq: 5000, freqEnd: 8000, type: 'bandpass', Q: 6, delay: 0.2 });
+  }
+
+  // ...and the thunderous lance itself
+  orbitalBlast() {
+    this._noise({ dur: 1.0, gain: 1.0, freq: 2400, freqEnd: 40 });
+    this._tone({ freq: 55, freqEnd: 20, dur: 1.1, gain: 0.8, type: 'triangle' });
+    this._tone({ freq: 1200, freqEnd: 100, dur: 0.35, gain: 0.3, type: 'sawtooth' });
+    this._noise({ dur: 0.25, gain: 0.5, freq: 6000, freqEnd: 900, type: 'bandpass', Q: 1.2 });
+  }
+
+  rocketFire() {
+    this._noise({ dur: 0.35, gain: 0.5, freq: 3000, freqEnd: 500 });
+    this._tone({ freq: 220, freqEnd: 90, dur: 0.3, gain: 0.3, type: 'sawtooth' });
+  }
+
   enemyShot() {
     this._tone({ freq: 800, freqEnd: 300, dur: 0.12, gain: 0.14, type: 'sawtooth' });
   }
